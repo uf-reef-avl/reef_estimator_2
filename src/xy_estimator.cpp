@@ -10,6 +10,7 @@ namespace reef_estimator
 {
     XYEstimator::XYEstimator() : Estimator()
     {
+        resetCount = 1;
         dt = 0.002;
 
         //Initial state
@@ -53,6 +54,8 @@ namespace reef_estimator
         phi = 0.;
         theta = 0.;
         psi = 0.;
+
+        relativeReset_publisher_ = nh_.advertise<geometry_msgs::Vector3>("deltaState", 1, true);
     }
 
     XYEstimator::~XYEstimator(){}
@@ -63,8 +66,8 @@ namespace reef_estimator
 
         reef_msgs::roll_pitch_yaw_from_rotation321(C_NED_to_body_frame, roll, pitch, yaw);
 
-        pitch_bias = xHat(2);
         roll_bias = xHat(3);
+        pitch_bias = xHat(2);
 
 
 
@@ -145,8 +148,7 @@ namespace reef_estimator
         multiplier = cos(xHat(8));
 
         Eigen::MatrixXd PartialYaw = Eigen::MatrixXd(2,1);
-//        PartialYaw << -xHat(0)*sin(xHat(8))-2*sin(xHat(8))*(cos(pe)*xc + sin(re)*sin(pe)*yc + cos(re)*sin(pe)*zc)*dt,
-//                      -xHat(1)*sin(xHat(8))-2*sin(xHat(8))*(cos(re)*yc - sin(re)*zc)*dt;
+
           PartialYaw<< -xHat(0)*sin(xHat(8)) - xHat(1)*cos(xHat(8)),
                         xHat(0)*cos(xHat(8)) - xHat(1)*cos(xHat(8));
 
@@ -164,14 +166,24 @@ namespace reef_estimator
         G << C_body_level_to_body_frame_2x2.transpose(),             zeros2x2,                          zeros2x2,                        zeros2x2,                         zeros2x1,
                             zeros2x2,                       Id.setIdentity(2,2),              zeros2x2,                        zeros2x2,                         zeros2x1,
                             zeros2x2,                                zeros2x2,                    Id.setIdentity(2,2),         zeros2x2,                         zeros2x1,
-                            zeros2x2,                                zeros2x2,                          zeros2x2,          C_body_level_to_body_frame_2x2.transpose(),     zeros2x1,
+                            zeros2x2,                                zeros2x2,                          zeros2x2,          C_body_level_to_body_frame_2x2.transpose()*PartialVel,     zeros2x1,
                             zeros1x2,                                zeros1x2,                          zeros1x2,                        zeros1x2,               1;
+
+//        C_body_level_to_body_frame_2x2.transpose(),             zeros2x2,                          zeros2x2,                        zeros2x2,                         zeros2x1,
+//                zeros2x2,                       Id.setIdentity(2,2),              zeros2x2,                        zeros2x2,                         zeros2x1,
+//                zeros2x2,                                zeros2x2,                    Id.setIdentity(2,2),         zeros2x2,                         zeros2x1,
+//                zeros2x2,                                zeros2x2,                          zeros2x2,          C_body_level_to_body_frame_2x2.transpose(),     zeros2x1,
+//                zeros1x2,                                zeros1x2,                          zeros1x2,                        zeros1x2,               1;
 
 
         P = P + (F*P.transpose() + P*F.transpose() + G*Q*G.transpose())*dt;
 //        P = F*P*F.transpose() + G*Q*G.transpose();
 
          distance = sqrt(pow(xHat(6),2) + pow(xHat(7),2));
+         if(XYTakeoff && distance > 0.25) {
+             XYEstimator::relativeReset(xHat, P);
+         }
+        
     }
 
     void XYEstimator::resetLandingState()
@@ -185,6 +197,57 @@ namespace reef_estimator
         //Reset velocity estimate
         xHat = xHat0;
         xHat(8) = psi;
+        lastYaw = psi;
+
+        // Initial delta test
+        global_x = xHat(6);
+        global_y = xHat(7);
+        global_yaw = xHat(8);
+
+//        XYTakeoff = false;
+    }
+
+
+    void XYEstimator::relativeReset(Eigen::MatrixXd &xHat, Eigen::MatrixXd &P){
+
+        // Publish current position and heading to topic to be read from backend compiler here (reset to zero after)
+        Delta.x = xHat(6);
+        Delta.y = xHat(7);
+        Delta.z = xHat(8) - lastYaw;
+
+        if(resetCount <= 2){
+            global_x = xHat(6);
+            global_y = xHat(7);
+            global_yaw = xHat(8);
+        }
+        else{
+            global_x = global_x + xHat(6);
+            global_y = global_y + xHat(7);
+            global_yaw = global_yaw + xHat(8) - lastYaw;
+        }
+
+        
+
+        relativeReset_publisher_.publish(Delta);
+        reef_msgs::roll_pitch_yaw_from_quaternion(orient0,phi, theta, psi);
+
+        xHat(6) = 0.;
+        xHat(7) = 0.;
+        xHat(8) = psi;
+        lastYaw = psi;
+        
+        Eigen::MatrixXd P6 = Eigen::MatrixXd(1,9);
+        Eigen::MatrixXd P7 = Eigen::MatrixXd(1,9);
+        Eigen::MatrixXd P8 = Eigen::MatrixXd(1,9);
+        P6 << 0, 0, 0, 0, 0, 0, P0(6,6), 0, 0;
+        P7 << 0, 0, 0, 0, 0, 0, 0, P0(7,7), 0;
+        P8 << 0, 0, 0, 0, 0, 0, 0, 0, P0(8,8);
+
+        P.block<1,9>(6,0) = P6;
+        P.block<1,9>(7,0) = P7;
+        P.block<1,9>(8,0) = P8;
+
+       resetCount++;
     }
 
     /* Implementation of propagate and update is not here, but

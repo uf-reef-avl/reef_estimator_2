@@ -1,12 +1,12 @@
 <launch>
 
     <arg name="run_estimator" default="true"/>
-    <arg name="use_rgbd" default="true"/>
-    <arg name="run_uncc" default="true"/>
+    <arg name="use_rgbd" default="false"/>
+    <arg name="run_uncc" default="false"/>
     <arg name="use_xtion" default="false"/>
     <arg name="vehicle" default="dodo"/>
-    <arg name="record_bag" default="true"/>
-    <arg name="record_images" default="true"/>
+    <arg name="record_bag" default="false"/>
+    <arg name="record_images" default="false"/>
     <arg name="bag_name" default="test"/>
 
     <node name="rosflight" pkg="rosflight" type="rosflight_io" output="screen">
@@ -18,6 +18,12 @@
         <rosparam file="$(find reef_estimator)/params/xy_est_params.yaml" />
         <rosparam file="$(find reef_estimator)/params/z_est_params.yaml" />
         <rosparam file="$(find reef_estimator)/params/basic_params.yaml" />
+        <rosparam>
+          enable_rgbd: false
+          enable_sonar: false
+          enable_mocap_xy: true
+          enable_mocap_z: true
+        </rosparam>
         <remap from="mocap_ned" to="pose_stamped"/>
         <remap from="mocap_velocity/body_level_frame" to="velocity/body_level_frame"/>
         <remap from="rgbd_velocity_body_frame" to="rgbd_velocity/body_level_frame"/>

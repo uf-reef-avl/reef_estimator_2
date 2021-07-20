@@ -18,10 +18,13 @@ namespace reef_estimator
         /*This class is inherited from Estimator, thus
             it has update and propagate methods already.
          */
+        ros::NodeHandle nh_;
+        ros::Publisher relativeReset_publisher_;
 
         Eigen::Matrix3d C_body_to_body_fixed_frame;
         void nonlinearPropagation(Eigen::Matrix3d &C,double initialAcc, Eigen::Vector3d accel_in_body, Eigen::Vector3d gyro_in_body, float bias_z_in_NED_component);
         void resetLandingState();
+        void relativeReset(Eigen::MatrixXd &xHat, Eigen::MatrixXd &P);
 
         Eigen::Matrix3d C_body_level_to_body_frame ;
         Eigen::Vector3d nonLinearDynamics;
@@ -47,6 +50,20 @@ namespace reef_estimator
         double theta;
         double psi;
         double distance;
+        double deltaX;
+        double deltaY;
+        double deltaPsi;
+
+        double global_x;
+        double global_y;
+        double global_yaw;
+
+        geometry_msgs::Vector3 Delta;
+
+        bool XYTakeoff;
+
+        int resetCount;
+        double lastYaw;
     };
 }
 

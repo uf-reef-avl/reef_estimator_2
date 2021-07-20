@@ -207,6 +207,7 @@ namespace reef_estimator
         {
             if (enableXY)
                 xyEst.resetLandingState();
+                xyEst.XYTakeoff = false;
             
             if (enableZ)
                 zEst.resetLandingState();
@@ -499,7 +500,8 @@ namespace reef_estimator
         {
             ROS_INFO("Takeoff!");
 
-            zEst.setTakeoffState(true);
+            zEst.setTakeoffState(true);\
+            xyEst.XYTakeoff = true;
             takeoffState.data = true;
             is_flying_publisher_.publish(takeoffState);
         } 
@@ -565,9 +567,16 @@ namespace reef_estimator
         //Publish XY and Z states
         xyzState.xy_plus.x_dot = xyEst.xHat(0);
         xyzState.xy_plus.y_dot = xyEst.xHat(1);
-        xyzState.xy_plus.x = xyEst.xHat(6);
-        xyzState.xy_plus.y = xyEst.xHat(7);
-        xyzState.yaw = xyEst.xHat(8);
+
+        //Publish if using delta mod
+        xyzState.xy_plus.x = xyEst.global_x;
+        xyzState.xy_plus.y = xyEst.global_y;
+        xyzState.yaw = xyEst.global_yaw;
+
+        // Publish if not using delta mod
+//        xyzState.xy_plus.x = xyEst.xHat(6);
+//        xyzState.xy_plus.y = xyEst.xHat(7);
+//        xyzState.yaw = xyEst.xHat(8);
 
         xyzState.z_plus.z = zEst.xHat(0);
         xyzState.z_plus.z_dot = zEst.xHat(1);
