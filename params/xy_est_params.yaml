@@ -47,5 +47,10 @@ xy_R0: [
 #Partial Update
 #xdot,  ydot,  roll_bias,  pitch_bias,  accX_bias,  accY_bias.
 xy_x0: [0, 0, 0, 0, 0, 0, 0.3, -0.2, -3.1415927],
-xy_beta: [1, 1, 0.03, 0.03, 0.001, 0.001, 1, 1, 1] #BEst plot until now
+xy_beta: [1, 1, 0.03, 0.03, 0.001, 0.001, 1, 1, 1], #BEst plot until now
+
+#Relative State Parameters
+delta_pose_limit: 0.01,
+delta_yaw_limit: 0.087,
+delta_time_limit: 2.0
 }

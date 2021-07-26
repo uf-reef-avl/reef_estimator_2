@@ -75,6 +75,11 @@ namespace reef_estimator
         reef_msgs::importMatrixFromParamServer(private_nh_, xyEst.betaVector, "xy_beta");
         xyEst.Q *= (xyEst.dt*xyEst.dt);
 
+        //Get the constraint to implement relative reset from yaml file
+        private_nh_.param<double>("delta_pose_limit", xyEst.dPoseLimit, 0.01);
+        private_nh_.param<double>("delta_yaw_limit", xyEst.dYawLimit, 0.08);
+        private_nh_.param<double>("delta_time_limit", xyEst.dTimeLimit, 2.0);
+
         xyEst.initialize();//Initialize P,R and beta.
 
         reef_msgs::importMatrixFromParamServer(private_nh_, zEst.xHat0, "z_x0");
@@ -90,6 +95,8 @@ namespace reef_estimator
         zEst.setTakeoffState(false);
         
         state_publisher_ = nh_.advertise<reef_msgs::XYZEstimate>("xyz_estimate", 1, true);
+        pose_publisher_ =  nh_.advertise<geometry_msgs::PoseStamped>("xy_pose", 1, true);
+        
         if (debug_mode_) {
             debug_state_publisher_ = nh_.advertise<reef_msgs::XYZDebugEstimate>("xyz_debug_estimate", 1, true);
 
@@ -146,6 +153,7 @@ namespace reef_estimator
         //Save the stamp. This is very important for good book-keeping.
         xyzState.header.stamp = imu.header.stamp;
         xyzDebugState.header.stamp = imu.header.stamp;
+        xyPose.header.stamp = imu.header.stamp;
 
         if (isnan(getVectorMagnitude(imu.linear_acceleration.x, imu.linear_acceleration.y,imu.linear_acceleration.z))){
             ROS_ERROR_STREAM("IMU is giving NaNs");
@@ -569,9 +577,9 @@ namespace reef_estimator
         xyzState.xy_plus.y_dot = xyEst.xHat(1);
 
         //Publish if using delta mod
-        xyzState.xy_plus.x = xyEst.global_x;
-        xyzState.xy_plus.y = xyEst.global_y;
-        xyzState.yaw = xyEst.global_yaw;
+//        xyzState.xy_plus.x = xyEst.global_x;
+//        xyzState.xy_plus.y = xyEst.global_y;
+//        xyzState.yaw = xyEst.global_yaw;
 
         // Publish if not using delta mod
 //        xyzState.xy_plus.x = xyEst.xHat(6);
@@ -582,6 +590,16 @@ namespace reef_estimator
         xyzState.z_plus.z_dot = zEst.xHat(1);
 
         state_publisher_.publish(xyzState);
+
+
+        xyPose.pose.position.x = xyEst.global_x;
+        xyPose.pose.position.y = xyEst.global_y;
+//        xyPose.pose.position.z = xyEst.global_yaw;
+//        xyPose.header.stamp = ros::Time::now().toSec();
+
+        reef_msgs::quaternion_from_roll_pitch_yaw(xyEst.roll_est, xyEst.pitch_est, xyEst.global_yaw, xyPose.pose.orientation);
+
+        pose_publisher_.publish(xyPose);
 
         if (debug_mode_)
         {

@@ -64,6 +64,15 @@ namespace reef_estimator
 
         int resetCount;
         double lastYaw;
+        double lastX;
+        double lastY;
+
+        double dPoseLimit;
+        double dYawLimit;
+        double dTimeLimit;
+
+        double currentTime;
+        double previousTime;
     };
 }
 
