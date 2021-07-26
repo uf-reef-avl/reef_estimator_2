@@ -66,7 +66,7 @@ namespace reef_estimator
         //Message holders
         reef_msgs::XYZEstimate xyzState;
         reef_msgs::XYZDebugEstimate xyzDebugState;
-        geometry_msgs::PoseStamped xyPose;
+        geometry_msgs::PoseStamped xyzPose;
 
         int numberOfPropagations;
 

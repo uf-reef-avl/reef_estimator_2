@@ -95,7 +95,7 @@ namespace reef_estimator
         zEst.setTakeoffState(false);
         
         state_publisher_ = nh_.advertise<reef_msgs::XYZEstimate>("xyz_estimate", 1, true);
-        pose_publisher_ =  nh_.advertise<geometry_msgs::PoseStamped>("xy_pose", 1, true);
+        pose_publisher_ =  nh_.advertise<geometry_msgs::PoseStamped>("xyz_pose", 1, true);
         
         if (debug_mode_) {
             debug_state_publisher_ = nh_.advertise<reef_msgs::XYZDebugEstimate>("xyz_debug_estimate", 1, true);
@@ -153,7 +153,7 @@ namespace reef_estimator
         //Save the stamp. This is very important for good book-keeping.
         xyzState.header.stamp = imu.header.stamp;
         xyzDebugState.header.stamp = imu.header.stamp;
-        xyPose.header.stamp = imu.header.stamp;
+        xyzPose.header.stamp = imu.header.stamp;
 
         if (isnan(getVectorMagnitude(imu.linear_acceleration.x, imu.linear_acceleration.y,imu.linear_acceleration.z))){
             ROS_ERROR_STREAM("IMU is giving NaNs");
@@ -592,14 +592,15 @@ namespace reef_estimator
         state_publisher_.publish(xyzState);
 
 
-        xyPose.pose.position.x = xyEst.global_x;
-        xyPose.pose.position.y = xyEst.global_y;
+        xyzPose.pose.position.x = xyEst.global_x;
+        xyzPose.pose.position.y = xyEst.global_y;
+        xyzPose.pose.position.z = zEst.xHat(0);
 //        xyPose.pose.position.z = xyEst.global_yaw;
 //        xyPose.header.stamp = ros::Time::now().toSec();
 
-        reef_msgs::quaternion_from_roll_pitch_yaw(xyEst.roll_est, xyEst.pitch_est, xyEst.global_yaw, xyPose.pose.orientation);
+        reef_msgs::quaternion_from_roll_pitch_yaw(xyEst.roll_est, xyEst.pitch_est, xyEst.global_yaw, xyzPose.pose.orientation);
 
-        pose_publisher_.publish(xyPose);
+        pose_publisher_.publish(xyzPose);
 
         if (debug_mode_)
         {
