@@ -201,7 +201,7 @@ namespace reef_estimator
 
         //Finally propagate.
         xyEst.nonlinearPropagation(C_NED_to_body_frame, initialAccMagnitude, accelxyz_in_body_frame, gyroxyz_in_body_frame, zEst.xHat(2));
-        zEst.updateLinearModel();//@Humberto: should this line and 206 come before 204 (look at last argument)?
+        zEst.updateLinearModel();
         zEst.propagate();
 
         //Update state publisher with states, error, and three sigma bounds
@@ -309,7 +309,7 @@ namespace reef_estimator
 
         if (useMocapZ) 
         {
-            if (chi2AcceptMocapZ(pose_msg.pose.position.z)) // @Humberto, what is going on here?
+            if (chi2AcceptMocapZ(pose_msg.pose.position.z))
             {
                 zEst.z(0) = pose_msg.pose.position.z;
                 newSonarMeasurement = true;

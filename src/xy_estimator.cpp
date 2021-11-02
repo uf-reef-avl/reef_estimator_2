@@ -33,7 +33,7 @@ namespace reef_estimator
              0.0;
         H = Eigen::MatrixXd(2,9);
         H <<  1, 0, 0, 0, 0, 0, 0, 0, 0, 
-              0, 1, 0, 0, 0, 0, 0, 0, 0; // @Humberto: Is this correct?
+              0, 1, 0, 0, 0, 0, 0, 0, 0;
         xHat0 = Eigen::MatrixXd(9,1);
         xHat = Eigen::MatrixXd(9,1);
         Q = Eigen::MatrixXd(9,9);
@@ -166,7 +166,7 @@ namespace reef_estimator
          distance = sqrt(pow(xHat(6),2) + pow(xHat(7),2));
     }
 
-    void XYEstimator::resetLandingState() // @Humberto; what is going on here?
+    void XYEstimator::resetLandingState()
     {
         //Reset covariance P
         P = P0;
