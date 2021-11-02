@@ -149,8 +149,7 @@ namespace reef_estimator
         
         void gyro_to_orientation_disc(Eigen::MatrixXd imu_gyro, Eigen::MatrixXd &q, double dt, Eigen::MatrixXd &w_last);
         Eigen::MatrixXd omega_generator(double a, double b, double c);
-        double yaw_calc_imu(double q1, double q2, double q3, double q4);
-        void sensorUpdate(sensor_msgs::MagneticField mag_msg);    
+        double yaw_calc_imu(double q1, double q2, double q3, double q4);  
         
         // variables for delta measurements
         bool mocap_flag;
