@@ -14,38 +14,43 @@ namespace reef_estimator
         dt = 0.002;
 
         //Initial state
-        F = Eigen::MatrixXd(9,9);
+        F = Eigen::MatrixXd(12,12);
         F.setZero();
 
-        G = Eigen::MatrixXd(9,9);
+        G = Eigen::MatrixXd(12,12);
         G.setZero();
 
         //P0 is created to save the initial covariance values. It keeps its value forever.
-        P0 = Eigen::MatrixXd(9,9);
+        P0 = Eigen::MatrixXd(12,12);
 
         //P is the covariance that the filter propagates.
-        P = Eigen::MatrixXd(9,9);
-        I = Eigen::MatrixXd(9,9);
+        P = Eigen::MatrixXd(12,12);
+        I = Eigen::MatrixXd(12,12);
         I.setIdentity();
-        K = Eigen::MatrixXd(9,2);
+        K = Eigen::MatrixXd(12,2);
         K.setZero();
-        z = Eigen::MatrixXd(2,1);
+        
+        z = Eigen::MatrixXd(3,1);
         z << 0.0,
+             0.0,
              0.0;
-        H = Eigen::MatrixXd(2,9);
-        H <<  1, 0, 0, 0, 0, 0, 0, 0, 0, 
-              0, 1, 0, 0, 0, 0, 0, 0, 0;
-        xHat0 = Eigen::MatrixXd(9,1);
-        xHat = Eigen::MatrixXd(9,1);
-        Q = Eigen::MatrixXd(9,9);
+             
+        H = Eigen::MatrixXd(3,12);
+        H <<  0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 
+              0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0,
+              0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0;
+                      
+        xHat0 = Eigen::MatrixXd(12,1);
+        xHat = Eigen::MatrixXd(12,1);
+        Q = Eigen::MatrixXd(12,12);
 
         //R0 represents a pseudo covariance that we use to initiate the propagations,
         //once we are in the air, we need to switch the actual R.
-        R0 = Eigen::MatrixXd(2,2);
-        R = Eigen::MatrixXd(2,2);
+        R0 = Eigen::MatrixXd(3,3);
+        R = Eigen::MatrixXd(3,3);
 
         //Beta values for partial update
-        betaVector = Eigen::MatrixXd(9,1);
+        betaVector = Eigen::MatrixXd(12,1);
 
         geometry_msgs::Quaternion orient2;
 
@@ -122,7 +127,10 @@ namespace reef_estimator
                 xHat(5),
                 xHat(6) + (xHat(0) * cos(xHat(8)) - xHat(1) * sin(xHat(8))) * dt,
                 xHat(7) + (xHat(0) * sin(xHat(8)) + xHat(1) * cos(xHat(8))) * dt,
-                xHat(8) + gyro_in_body_level_frame(2) * dt;
+                xHat(8) + gyro_in_body_level_frame(2) * dt,
+                xHat(9),
+                xHat(10),
+                xHat(11);
 
 
         //Now compute th Jacobian F for the non-linear dynamics. After this, we compute the predict the covariance.
@@ -151,7 +159,7 @@ namespace reef_estimator
         Eigen::MatrixXd PartialYaw = Eigen::MatrixXd(2, 1);
 
         PartialYaw << -xHat(0) * sin(xHat(8)) - xHat(1) * cos(xHat(8)),
-                xHat(0) * cos(xHat(8)) - xHat(1) * cos(xHat(8));
+                xHat(0) * cos(xHat(8)) - xHat(1) * sin(xHat(8));
 
         Eigen::Matrix2d PartialVel;
         PartialVel << cos(xHat(8)), -sin(xHat(8)),
@@ -216,6 +224,7 @@ namespace reef_estimator
         reef_msgs::roll_pitch_yaw_from_quaternion(orient0,phi, theta, psi);
         roll = phi;
         pitch = theta;
+        
 
         //Reset velocity estimate
         xHat = xHat0;
@@ -240,6 +249,8 @@ namespace reef_estimator
         Delta.y = xHat(7);
         Delta.z = xHat(8) - lastYaw;
 
+        reef_msgs::roll_pitch_yaw_from_quaternion(orient0,phi, theta, psi);
+
         if(resetCount <= 2){
             global_x = xHat(6);
             global_y = xHat(7);
@@ -248,13 +259,13 @@ namespace reef_estimator
         else{
             global_x = global_x + xHat(6) - lastX;
             global_y = global_y + xHat(7) - lastY;
-            global_yaw = global_yaw + xHat(8) - lastYaw;
+            global_yaw = psi;
         }
 
         
 
         relativeReset_publisher_.publish(Delta);
-        reef_msgs::roll_pitch_yaw_from_quaternion(orient0,phi, theta, psi);
+
 
         xHat(6) = 0.;
         xHat(7) = 0.;
