@@ -23,10 +23,8 @@
 #include <ros/ros.h>
 #include <std_msgs/Bool.h>
 #include <sensor_msgs/Imu.h>
-/////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-#include <sensor_msgs/MagneticField.h>
-/////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 #include <sensor_msgs/Range.h>
+#include <geometry_msgs/PoseWithCovarianceStamped.h>
 #include <rosflight_msgs/RCRaw.h>
 
 #include <reef_msgs/DeltaToVel.h>
@@ -42,23 +40,11 @@ namespace reef_estimator {
         ros::NodeHandle nh_;
 
         ros::Subscriber imu_subscriber_;
-        
-        ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-        //ros::Subscriber mag_subscriber_;
-        ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-        
         ros::Subscriber altimeter_subscriber_;
         ros::Subscriber rc_subscriber_;
-        ros::Subscriber mocap_pose_subscriber_;
-        ros::Subscriber mocap_pose_subscriber_2;
-        ros::Subscriber mocap_twist_subscriber_;
-        ros::Subscriber rgbd_twist_subscriber_;
-        ros::Subscriber rgbd_sigmas_subscriber_;
+        ros::Subscriber delta_pose_subscriber_;
 
         ros::Publisher range_ned_publisher_;
-
-        std::string mocapPoseTopic, mocapPoseTopic2, mocapTwistTopic;
-        std::string rgbdTwistTopic;
 
         XYZEstimator xyzEst;
         sensor_msgs::Imu imu_msg;
@@ -69,10 +55,7 @@ namespace reef_estimator {
         void imuCallback(const sensor_msgs::ImuConstPtr &msg);
         void altimeterCallback(const sensor_msgs::RangeConstPtr &msg);
         void rcRawCallback(const rosflight_msgs::RCRawConstPtr &msg);
-        void mocapPoseCallbackZ(const geometry_msgs::PoseStampedConstPtr &msg);
-        void mocapPoseCallbackXY(const geometry_msgs::PoseStampedConstPtr &msg);
-        void mocapTwistCallback(const geometry_msgs::TwistWithCovarianceStampedConstPtr &msg);
-        void rgbdTwistCallback(const reef_msgs::DeltaToVelConstPtr &msg);
+        void deltaPoseCallback(const geometry_msgs::PoseWithCovarianceStampedConstPtr &msg);
 
         bool initialized_;
         bool imuCalibrated;
@@ -85,12 +68,6 @@ namespace reef_estimator {
     public:
         SensorManager();
         ~SensorManager();
-	
-	///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-	//void magCallback(const sensor_msgs::MagneticFieldConstPtr &msg);
-	///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-
-        };
+    };
 }
 #endif

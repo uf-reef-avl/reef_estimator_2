@@ -252,29 +252,6 @@ namespace reef_estimator
         checkTakeoffState(accelxyz_in_body_frame.norm());
     }
 
-    void XYZEstimator::rgbdUpdate(reef_msgs::DeltaToVel twist_msg)
-    {
-        if (!useMocapXY)
-        {
-            if (chi2AcceptRgbd(twist_msg.vel))
-            {
-                xyEst.R(0, 0) = twist_msg.vel.twist.covariance[0];
-                xyEst.R(1, 1) = twist_msg.vel.twist.covariance[7];
-                xyEst.z(0) = twist_msg.vel.twist.twist.linear.x;
-                xyEst.z(1) = twist_msg.vel.twist.twist.linear.y;
-                newRgbdMeasurement = true;
-            }
-        }
-    }
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-  /* void XYZEstimator::sensorUpdate(sensor_msgs::MagneticField mag_msg)
-   {
-   
-   } */
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-
     //Sonar update
     void XYZEstimator::sensorUpdate(sensor_msgs::Range range_msg) 
     {
@@ -291,93 +268,23 @@ namespace reef_estimator
         }
     }
 
-    //Mocap XY update
-    //void XYZEstimator::mocapUpdate(geometry_msgs::TwistWithCovarianceStamped twist_msg) 
-    //{
-        //if (useMocapXY)
-        //{
-            //if (chi2AcceptMocapXY(twist_msg))
-            //{
-                //if (mocap_flag = false) {
-                	//z is the measurement.
-                	//x_R_minus = twist_msg.twist.covariance[0];
-                	
-                	//y_R_minus = twist_msg.twist.covariance[7];
-                                
-                	//mocap_flag = true;
-                //}
-                //else if (xyEst.want_delta = true) {
-                	//z is the measurement.
-                     	//x_R_plus = twist_msg.twist.covariance[0];
-                     	//xyEst.R(0, 0) = x_R_plus + x_R_minus;
-                     	//x_R_minus = x_R_plus;
-                     	
-                	//y_R_plus = twist_msg.twist.covariance[7];
-                	//xyEst.R(1,1) = y_R_plus + y_R_minus;
-                	//y_R_minus = y_R_plus;
-                	                                
-                	//newRgbdMeasurement = true;
-                	//xyEst.want_delta = false;
-                //}  
-                
-        //}
-    //}
-
     //Mocap XY Pose update
-    void XYZEstimator::mocapUpdateXYpose(geometry_msgs::PoseStamped pose_msg) 
+    void XYZEstimator::deltaPoseUpdate(geometry_msgs::Pose pose_msg)
     {
-        if (useMocapZ) 
-        {
-            if (chi2AcceptMocapZ(pose_msg.pose.position.z)) 
-            {
-            	
-            	if (mocap_flag = false) {
-                	//z is the measurement.              	
-                	x_z_minus = pose_msg.pose.position.x;
-                	
-                	y_z_minus = pose_msg.pose.position.y;
-                                
-                	mocap_flag = true;
-                }
-                else if (xyEst.want_delta = true) {
-                	//z is the measurement.               	
-                	x_z_plus = pose_msg.pose.position.x;
-                	xyEst.z(0) = x_z_plus - x_z_minus;
-                	x_z_minus = x_z_plus;
-                	
-                	y_z_plus = pose_msg.pose.position.y;
-                	xyEst.z(1) = y_z_plus - y_z_minus;
-                	y_z_minus = y_z_plus;
-                	                                
-                	newRgbdMeasurement = true;
-                	xyEst.want_delta = false;
-                }  
-            	
-            	// get initial values for xy position estimator from mocap
-                xyEst.orient0  = pose_msg.pose.orientation;
-                xyEst.xHat0(6) = pose_msg.pose.position.x;
-                xyEst.xHat0(7) = pose_msg.pose.position.y;
 
-            }
-        }
-    }
-
-    //Mocap Z update
-    void XYZEstimator::mocapUpdate(geometry_msgs::PoseStamped pose_msg) 
-    {
-        if (useMocapZ) 
+        if (chi2AcceptDeltaPose(pose_msg))
         {
-            if (chi2AcceptMocapZ(pose_msg.pose.position.z)) 
-            {               
-                zEst.z(0) = pose_msg.pose.position.z;
-                newSonarMeasurement = true;
-            }
-            
-            // get initial values for xy position estimator from mocap
-                xyEst.orient0  = pose_msg.pose.orientation;
-                xyEst.xHat0(6) = pose_msg.pose.position.x;
-                xyEst.xHat0(7) = pose_msg.pose.position.y;
+            x_z_plus = pose_msg.position.x;
+            xyEst.z(0) = x_z_plus - x_z_minus;
+            x_z_minus = x_z_plus;
+
+            y_z_plus = pose_msg.position.y;
+            xyEst.z(1) = y_z_plus - y_z_minus;
+            y_z_minus = y_z_plus;
+
+            newRgbdMeasurement = true;
         }
+
     }
 
     bool XYZEstimator::chi2Accept(float range_measurement) 
@@ -407,71 +314,15 @@ namespace reef_estimator
         }
     }
 
-    bool XYZEstimator::chi2AcceptRgbd(geometry_msgs::TwistWithCovarianceStamped twist_msg) 
-    {
-
-        //Compute Mahalanobis distance.
-       measurement << twist_msg.twist.twist.linear.x, twist_msg.twist.twist.linear.y;
-       expected_rgbd = xyEst.H * xyEst.xHat;
-
-        Eigen::MatrixXd S(1, 1);
-        S = xyEst.H * xyEst.P * xyEst.H.transpose() + xyEst.R;
-
-        Mahalanobis_D_hat_square(0) = (measurement - expected_rgbd).transpose() * S.inverse() * (measurement - expected_rgbd);
-        Mahalanobis_D_hat(0) = sqrt(Mahalanobis_D_hat_square(0));
-
-        //Value for 99% we need 6.63.
-        //Value for 95% we 3.84
-        if (Mahalanobis_D_hat_square(0) > mahalanobis_distance_rgbd_xy_)
-        {
-            ROS_INFO_STREAM("RGBD measurement rejected");
-            return false;
-        } 
-        else 
-        {
-            return true;
-        }
-    }
-
-    bool XYZEstimator::chi2AcceptMocapZ(float z_mocap_ned) 
-    {
-        //Compute Mahalanobis distance.
-        range = Eigen::VectorXd(1);
-        range(0) = z_mocap_ned;
-        expected_measurement = Eigen::VectorXd(1);
-        expected_measurement = zEst.H * zEst.xHat;
-
-        Eigen::MatrixXd S(1, 1);
-        S = zEst.H * zEst.P * zEst.H.transpose() + zEst.R;
-
-        Mahalanobis_D_hat_square(0) =
-                (range - expected_measurement).transpose() * S.inverse() * (range - expected_measurement);
-        Mahalanobis_D_hat(0) = sqrt(Mahalanobis_D_hat_square(0));
-
-        //Value for 99% we need 6.63.
-        //Value for 95% we 3.84
-        if (Mahalanobis_D_hat_square(0) > mahalanobis_distance_mocap_z)
-        {
-            ROS_INFO_STREAM("MOCAP Z measurement rejected");
-            return false;
-        } 
-        else 
-        {
-            return true;
-        }
-    }
-
-
-    bool XYZEstimator::chi2AcceptMocapXY(geometry_msgs::TwistWithCovarianceStamped twist_msg) 
+    bool XYZEstimator::chi2AcceptDeltaPose(geometry_msgs::Pose pose)
     {
         //Compute Mahalanobis distance.
         Eigen::Vector2d measurement;
-        measurement << twist_msg.twist.twist.linear.x, twist_msg.twist.twist.linear.y;
+        measurement << pose.position.x, pose.position.y;
 
         Eigen::Vector2d expected_rgbd;
         expected_rgbd = xyEst.H * xyEst.xHat;
         Eigen::MatrixXd S(1, 1);
-        //        Eigen::Matrix2d mocap_R;
 
         S = xyEst.H * xyEst.P * xyEst.H.transpose() + xyEst.R;
         Mahalanobis_D_hat_square(0) = (measurement - expected_rgbd).transpose() * S.inverse() * (measurement - expected_rgbd);
@@ -483,11 +334,8 @@ namespace reef_estimator
             ROS_INFO_STREAM("MOCAP XY measurement rejected");
             return false;
         } 
-        else 
-        {
+        else
             return true;
-        }
-        
     }
 
     //Hypothesis rejector - can be used with sonar instead of chi2

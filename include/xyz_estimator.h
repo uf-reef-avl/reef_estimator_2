@@ -17,13 +17,6 @@
 #include <reef_msgs/XYZEstimate.h>
 #include <reef_msgs/DeltaToVel.h>
 
-/////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-#include <sensor_msgs/MagneticField.h>
-
-#include "MatrixExponential.h"
-
-/////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
 #include "z_estimator.h"
 #include "xy_estimator.h"
 #include <reef_msgs/matrix_operation.h>
@@ -115,13 +108,10 @@ namespace reef_estimator
 
         void initializeAcc(geometry_msgs::Vector3 acc);
         bool chi2Accept(float range_measurement);
-        bool chi2AcceptRgbd(geometry_msgs::TwistWithCovarianceStamped twist_msg);
 
-        bool chi2AcceptMocapXY(geometry_msgs::TwistWithCovarianceStamped twist_msg);
-        bool chi2AcceptMocapZ(float z_mocap_ned);
+        bool chi2AcceptDeltaPose(geometry_msgs::Pose pose);
         
         bool hypothesisAccept(float range_measurement);
-        float correctRange(float range_measurement);
 
     public:
         XYZEstimator();
@@ -135,12 +125,9 @@ namespace reef_estimator
         void sensorUpdate(sensor_msgs::Imu imu);
         void sensorUpdate(sensor_msgs::Range range_msg);
         void mocapUpdate(geometry_msgs::PoseStamped pose_msg);
-        void mocapUpdate(geometry_msgs::TwistWithCovarianceStamped twist_msg);
-        void mocapUpdateXYpose(geometry_msgs::PoseStamped pose_msg);
-        void rgbdUpdate(reef_msgs::DeltaToVel twist_msg);
+        void deltaPoseUpdate(geometry_msgs::Pose pose_msg);
         
-///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////        
-        
+
         Eigen::MatrixXd imu_gyro;
         
         Eigen::MatrixXd w_last;
