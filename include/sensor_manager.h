@@ -50,13 +50,14 @@ namespace reef_estimator {
         ros::Subscriber altimeter_subscriber_;
         ros::Subscriber rc_subscriber_;
         ros::Subscriber mocap_pose_subscriber_;
+        ros::Subscriber mocap_pose_subscriber_2;
         ros::Subscriber mocap_twist_subscriber_;
         ros::Subscriber rgbd_twist_subscriber_;
         ros::Subscriber rgbd_sigmas_subscriber_;
 
         ros::Publisher range_ned_publisher_;
 
-        std::string mocapPoseTopic, mocapTwistTopic;
+        std::string mocapPoseTopic, mocapPoseTopic2, mocapTwistTopic;
         std::string rgbdTwistTopic;
 
         XYZEstimator xyzEst;
@@ -68,7 +69,8 @@ namespace reef_estimator {
         void imuCallback(const sensor_msgs::ImuConstPtr &msg);
         void altimeterCallback(const sensor_msgs::RangeConstPtr &msg);
         void rcRawCallback(const rosflight_msgs::RCRawConstPtr &msg);
-        void mocapPoseCallback(const geometry_msgs::PoseStampedConstPtr &msg);
+        void mocapPoseCallbackZ(const geometry_msgs::PoseStampedConstPtr &msg);
+        void mocapPoseCallbackXY(const geometry_msgs::PoseStampedConstPtr &msg);
         void mocapTwistCallback(const geometry_msgs::TwistWithCovarianceStampedConstPtr &msg);
         void rgbdTwistCallback(const reef_msgs::DeltaToVelConstPtr &msg);
 

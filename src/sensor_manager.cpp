@@ -16,14 +16,19 @@ namespace reef_estimator
 
         if (xyzEst.enableMocapXY)
         {
-            private_nh_.param<std::string>("mocap_twist_topic", mocapTwistTopic, "mocap_velocity/body_level_frame");
-            mocap_twist_subscriber_ = nh_.subscribe(mocapTwistTopic, 1, &SensorManager::mocapTwistCallback, this);
+            //private_nh_.param<std::string>("mocap_twist_topic", mocapTwistTopic, "mocap_velocity/body_level_frame");
+            //mocap_twist_subscriber_ = nh_.subscribe(mocapTwistTopic, 1, &SensorManager::mocapTwistCallback, this);
+            
+            ///////////////////////////////////////////////////////////////////////////////////////////////////////
+            private_nh_.param<std::string>("mocap_pose_topic", mocapPoseTopic2, "mocap_ned");
+            mocap_pose_subscriber_2 = nh_.subscribe(mocapPoseTopic2, 1, &SensorManager::mocapPoseCallbackXY, this);
+            ///////////////////////////////////////////////////////////////////////////////////////////////////////
         }
 
         if (xyzEst.enableMocapZ)
         {
             private_nh_.param<std::string>("mocap_pose_topic", mocapPoseTopic, "mocap_ned");
-            mocap_pose_subscriber_ = nh_.subscribe(mocapPoseTopic, 1, &SensorManager::mocapPoseCallback, this);
+            mocap_pose_subscriber_ = nh_.subscribe(mocapPoseTopic, 1, &SensorManager::mocapPoseCallbackZ, this);
         }
 
         if (xyzEst.enableRGBD) {
@@ -97,15 +102,20 @@ namespace reef_estimator
         }
     }
 
-    void SensorManager::mocapPoseCallback(const geometry_msgs::PoseStampedConstPtr &msg)
+    void SensorManager::mocapPoseCallbackZ(const geometry_msgs::PoseStampedConstPtr &msg)
     {
         xyzEst.mocapUpdate(*msg);
     }
 
-    void SensorManager::mocapTwistCallback(const geometry_msgs::TwistWithCovarianceStampedConstPtr &msg)
+    void SensorManager::mocapPoseCallbackXY(const geometry_msgs::PoseStampedConstPtr &msg)
     {
-        xyzEst.mocapUpdate(*msg);
+        xyzEst.mocapUpdateXYpose(*msg);
     }
+
+    //void SensorManager::mocapTwistCallback(const geometry_msgs::TwistWithCovarianceStampedConstPtr &msg)
+    //{
+      //  xyzEst.mocapUpdate(*msg);
+    //}
 
     void SensorManager::rgbdTwistCallback(const reef_msgs::DeltaToVelConstPtr &msg)
     {

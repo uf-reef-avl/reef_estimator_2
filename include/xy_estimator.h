@@ -8,6 +8,7 @@
 #include "estimator.h"
 #include "../../reef_msgs/include/reef_msgs/dynamics.h"
 
+
 namespace reef_estimator
 {
     class XYEstimator : public Estimator
@@ -29,6 +30,8 @@ namespace reef_estimator
         Eigen::Matrix3d C_body_level_to_body_frame ;
         Eigen::Vector3d nonLinearDynamics;
         Eigen::Matrix2d Id;
+        
+        // orientation variables 
         double pitch;
         double roll;
         double yaw;
@@ -38,26 +41,32 @@ namespace reef_estimator
         double pitch_est;
         double roll_est;
         double yaw_est;
+        
+        // variables for simplification of F matrix
         double xc;
         double yc;
         double zc;
         double pe;
         double re;
         double ye;
+        
+        // true orientation (used for heading)
         geometry_msgs::Quaternion  orient0;
-        Eigen::Quaterniond q;
         double phi;
         double theta;
         double psi;
+        
+        // distance propagated
         double distance;
-        double deltaX;
-        double deltaY;
-        double deltaPsi;
-
+        
+        // accumulated variables to be published
         double global_x;
         double global_y;
         double global_yaw;
-
+        double accum_x_vel;
+        double accum_y_vel;
+	
+	// msg if want to publish deltas
         geometry_msgs::Vector3 Delta;
 
         bool XYTakeoff;
@@ -66,6 +75,8 @@ namespace reef_estimator
         double lastYaw;
         double lastX;
         double lastY;
+        double lastX_vel;
+        double lastY_vel;
 
         double dPoseLimit;
         double dYawLimit;
@@ -73,6 +84,9 @@ namespace reef_estimator
 
         double currentTime;
         double previousTime;
+        
+        bool want_delta;
+        
     };
 }
 

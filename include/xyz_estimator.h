@@ -136,6 +136,7 @@ namespace reef_estimator
         void sensorUpdate(sensor_msgs::Range range_msg);
         void mocapUpdate(geometry_msgs::PoseStamped pose_msg);
         void mocapUpdate(geometry_msgs::TwistWithCovarianceStamped twist_msg);
+        void mocapUpdateXYpose(geometry_msgs::PoseStamped pose_msg);
         void rgbdUpdate(reef_msgs::DeltaToVel twist_msg);
         
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////        
@@ -163,6 +164,18 @@ namespace reef_estimator
         Eigen::MatrixXd omega_generator(double a, double b, double c);
         double yaw_calc_imu(double q1, double q2, double q3, double q4);
         void sensorUpdate(sensor_msgs::MagneticField mag_msg);    
+        
+        // variables for delta measurements
+        bool mocap_flag;
+        double x_R_minus;
+        double y_R_minus;
+        double x_R_plus;
+        double y_R_plus;
+        double x_z_minus;
+        double y_z_minus;
+        double x_z_plus;
+        double y_z_plus;
+        
         
   /////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////      
 

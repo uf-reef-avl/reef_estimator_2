@@ -121,6 +121,10 @@ namespace reef_estimator
         takeoffState.data = false;
         zSigma(0) = zSigma(1) = 0;
 
+	// Initialize a flag for velocity measurements, since we are wanting deltas need at least 2 mocap measurements to update
+	mocap_flag = false;
+	
+	
     }
 
     XYZEstimator::~XYZEstimator() {}
@@ -288,18 +292,72 @@ namespace reef_estimator
     }
 
     //Mocap XY update
-    void XYZEstimator::mocapUpdate(geometry_msgs::TwistWithCovarianceStamped twist_msg) 
+    //void XYZEstimator::mocapUpdate(geometry_msgs::TwistWithCovarianceStamped twist_msg) 
+    //{
+        //if (useMocapXY)
+        //{
+            //if (chi2AcceptMocapXY(twist_msg))
+            //{
+                //if (mocap_flag = false) {
+                	//z is the measurement.
+                	//x_R_minus = twist_msg.twist.covariance[0];
+                	
+                	//y_R_minus = twist_msg.twist.covariance[7];
+                                
+                	//mocap_flag = true;
+                //}
+                //else if (xyEst.want_delta = true) {
+                	//z is the measurement.
+                     	//x_R_plus = twist_msg.twist.covariance[0];
+                     	//xyEst.R(0, 0) = x_R_plus + x_R_minus;
+                     	//x_R_minus = x_R_plus;
+                     	
+                	//y_R_plus = twist_msg.twist.covariance[7];
+                	//xyEst.R(1,1) = y_R_plus + y_R_minus;
+                	//y_R_minus = y_R_plus;
+                	                                
+                	//newRgbdMeasurement = true;
+                	//xyEst.want_delta = false;
+                //}  
+                
+        //}
+    //}
+
+    //Mocap XY Pose update
+    void XYZEstimator::mocapUpdateXYpose(geometry_msgs::PoseStamped pose_msg) 
     {
-        if (useMocapXY)
+        if (useMocapZ) 
         {
-            if (chi2AcceptMocapXY(twist_msg))
+            if (chi2AcceptMocapZ(pose_msg.pose.position.z)) 
             {
-                //z is the measurement.
-                xyEst.R(0, 0) = twist_msg.twist.covariance[0];
-                xyEst.R(1, 1) = twist_msg.twist.covariance[7];
-                xyEst.z(0) = twist_msg.twist.twist.linear.x;
-                xyEst.z(1) = twist_msg.twist.twist.linear.y;
-                newRgbdMeasurement = true;
+            	
+            	if (mocap_flag = false) {
+                	//z is the measurement.              	
+                	x_z_minus = pose_msg.pose.position.x;
+                	
+                	y_z_minus = pose_msg.pose.position.y;
+                                
+                	mocap_flag = true;
+                }
+                else if (xyEst.want_delta = true) {
+                	//z is the measurement.               	
+                	x_z_plus = pose_msg.pose.position.x;
+                	xyEst.z(0) = x_z_plus - x_z_minus;
+                	x_z_minus = x_z_plus;
+                	
+                	y_z_plus = pose_msg.pose.position.y;
+                	xyEst.z(1) = y_z_plus - y_z_minus;
+                	y_z_minus = y_z_plus;
+                	                                
+                	newRgbdMeasurement = true;
+                	xyEst.want_delta = false;
+                }  
+            	
+            	// get initial values for xy position estimator from mocap
+                xyEst.orient0  = pose_msg.pose.orientation;
+                xyEst.xHat0(6) = pose_msg.pose.position.x;
+                xyEst.xHat0(7) = pose_msg.pose.position.y;
+
             }
         }
     }
@@ -307,18 +365,18 @@ namespace reef_estimator
     //Mocap Z update
     void XYZEstimator::mocapUpdate(geometry_msgs::PoseStamped pose_msg) 
     {
-
-
         if (useMocapZ) 
         {
             if (chi2AcceptMocapZ(pose_msg.pose.position.z)) 
-            {
-                xyEst.orient0  = pose_msg.pose.orientation;
-                xyEst.xHat0(6) = pose_msg.pose.position.x;
-                xyEst.xHat0(7) = pose_msg.pose.position.y;
+            {               
                 zEst.z(0) = pose_msg.pose.position.z;
                 newSonarMeasurement = true;
             }
+            
+            // get initial values for xy position estimator from mocap
+                xyEst.orient0  = pose_msg.pose.orientation;
+                xyEst.xHat0(6) = pose_msg.pose.position.x;
+                xyEst.xHat0(7) = pose_msg.pose.position.y;
         }
     }
 
