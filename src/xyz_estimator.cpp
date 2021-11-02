@@ -21,6 +21,7 @@ namespace reef_estimator
     accTakeoffState(false),
     newSonarMeasurement(false),
     newRgbdMeasurement(false),
+    initialize_with_mocap(true),
     rgbdCounter(0)
     {
         private_nh_.param<bool>("debug_mode", debug_mode_, false);
@@ -73,7 +74,24 @@ namespace reef_estimator
         reef_msgs::importMatrixFromParamServer(private_nh_, xyEst.Q, "xy_Q");
         reef_msgs::importMatrixFromParamServer(private_nh_, xyEst.R0, "xy_R0");
         reef_msgs::importMatrixFromParamServer(private_nh_, xyEst.betaVector, "xy_beta");
+        reef_msgs::importMatrixFromParamServer(private_nh_, xyEst.R_GPS, "R_GPS");
         xyEst.Q *= (xyEst.dt*xyEst.dt);
+
+        private_nh_.param<bool>("initialize_with_mocap", initialize_with_mocap, true);
+        if(initialize_with_mocap) {
+            std::string mocapPoseTopic;
+            private_nh_.param<std::string>("mocap_pose_topic", mocapPoseTopic, "mocap_ned");
+            geometry_msgs::PoseStampedConstPtr pose_msg;
+            pose_msg = ros::topic::waitForMessage<geometry_msgs::PoseStamped>(mocapPoseTopic, nh_);
+            if (pose_msg != NULL) {
+                ROS_INFO_STREAM("GOT MY FIRST MOCAP MESSAGE");
+                double roll, pitch, yaw;
+                reef_msgs::roll_pitch_yaw_from_quaternion(pose_msg->pose.orientation,roll, pitch, yaw);
+                xyEst.xHat0(0) = pose_msg->pose.position.x;
+                xyEst.xHat0(1) = pose_msg->pose.position.y;
+                xyEst.xHat0(8) = yaw;
+            }
+        }
 
         xyEst.initialize();//Initialize P,R and beta.
 
@@ -185,7 +203,7 @@ namespace reef_estimator
 
         //Finally propagate.
         xyEst.nonlinearPropagation(C_NED_to_body_frame, initialAccMagnitude, accelxyz_in_body_frame, gyroxyz_in_body_frame, zEst.xHat(2));
-        zEst.updateLinearModel();
+        zEst.updateLinearModel();//@Humberto: should this line and 206 come before 204 (look at last argument)?
         zEst.propagate();
 
         //Update state publisher with states, error, and three sigma bounds
@@ -254,14 +272,6 @@ namespace reef_estimator
         }
     }
 
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-  /* void XYZEstimator::sensorUpdate(sensor_msgs::MagneticField mag_msg)
-   {
-   
-   } */
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-
     //Sonar update
     void XYZEstimator::sensorUpdate(sensor_msgs::Range range_msg) 
     {
@@ -302,15 +312,22 @@ namespace reef_estimator
 
         if (useMocapZ) 
         {
-            if (chi2AcceptMocapZ(pose_msg.pose.position.z)) 
+            if (chi2AcceptMocapZ(pose_msg.pose.position.z)) // @Humberto, what is going on here?
             {
-                xyEst.orient0  = pose_msg.pose.orientation;
-                xyEst.xHat0(6) = pose_msg.pose.position.x;
-                xyEst.xHat0(7) = pose_msg.pose.position.y;
                 zEst.z(0) = pose_msg.pose.position.z;
                 newSonarMeasurement = true;
             }
         }
+        bool enable_gps;
+        private_nh_.param<bool>("enable_gps", enable_gps, false);
+        if(enable_gps) {
+
+            ROS_INFO_STREAM("Updating States!");
+            double roll, pitch, yaw;
+            reef_msgs::roll_pitch_yaw_from_quaternion(pose_msg.pose.orientation,roll, pitch, yaw);
+            xyEst.updateGPSState(Eigen::Vector3d(pose_msg.pose.position.x,pose_msg.pose.position.y, yaw ));
+        }
+
     }
 
     bool XYZEstimator::chi2Accept(float range_measurement) 
@@ -567,7 +584,7 @@ namespace reef_estimator
         xyzState.xy_plus.y_dot = xyEst.xHat(1);
         xyzState.xy_plus.x = xyEst.xHat(6);
         xyzState.xy_plus.y = xyEst.xHat(7);
-        xyzState.yaw = xyEst.xHat(8);
+        xyzState.xy_plus.yaw = xyEst.xHat(8);
 
         xyzState.z_plus.z = zEst.xHat(0);
         xyzState.z_plus.z_dot = zEst.xHat(1);

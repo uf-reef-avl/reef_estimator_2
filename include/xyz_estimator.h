@@ -90,6 +90,7 @@ namespace reef_estimator
         double accSamples[ACC_SAMPLE_SIZE], sonarSamples[SONAR_SAMPLE_SIZE];
         double accMean, accVariance, sonarMean, sonarVariance;
         bool newRgbdMeasurement, newSonarMeasurement;
+        bool initialize_with_mocap;
         int rgbdCounter;
 
         Eigen::Matrix3d C_NED_to_body_frame;

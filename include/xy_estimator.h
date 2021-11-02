@@ -22,10 +22,12 @@ namespace reef_estimator
         Eigen::Matrix3d C_body_to_body_fixed_frame;
         void nonlinearPropagation(Eigen::Matrix3d &C,double initialAcc, Eigen::Vector3d accel_in_body, Eigen::Vector3d gyro_in_body, float bias_z_in_NED_component);
         void resetLandingState();
+        void updateGPSState(Eigen::Vector3d pose);
 
         Eigen::Matrix3d C_body_level_to_body_frame ;
         Eigen::Vector3d nonLinearDynamics;
         Eigen::Matrix2d Id;
+        Eigen::Matrix3d R_GPS;
         double pitch;
         double roll;
         double yaw;

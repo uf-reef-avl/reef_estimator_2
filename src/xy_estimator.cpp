@@ -33,7 +33,7 @@ namespace reef_estimator
              0.0;
         H = Eigen::MatrixXd(2,9);
         H <<  1, 0, 0, 0, 0, 0, 0, 0, 0, 
-              0, 1, 0, 0, 0, 0, 0, 0, 0;
+              0, 1, 0, 0, 0, 0, 0, 0, 0; // @Humberto: Is this correct?
         xHat0 = Eigen::MatrixXd(9,1);
         xHat = Eigen::MatrixXd(9,1);
         Q = Eigen::MatrixXd(9,9);
@@ -59,18 +59,13 @@ namespace reef_estimator
 
     void XYEstimator::nonlinearPropagation(Eigen::Matrix3d &C_NED_to_body_frame, double initialAccMagnitude,Eigen::Vector3d accelxyz_in_body_frame, Eigen::Vector3d gyroxyz_in_body_frame, float bias_z_in_NED_component)
     {
-      
-
         reef_msgs::roll_pitch_yaw_from_rotation321(C_NED_to_body_frame, roll, pitch, yaw);
 
         pitch_bias = xHat(2);
         roll_bias = xHat(3);
 
-
-
-        pitch_est = pitch - pitch_bias;
-        roll_est = roll - roll_bias;
-
+        pitch_est = pitch - pitch_bias; // @Humberto: This is currently coming from mocap and not ROSFlight
+        roll_est = roll - roll_bias; // @Humberto: This is currently coming from mocap and not ROSFlight
 
         C_body_level_to_body_frame << cos(pitch_est),               0,              -sin(pitch_est),
                 sin(roll_est)*sin(pitch_est), cos(roll_est),  sin(roll_est)*cos(pitch_est),
@@ -145,8 +140,6 @@ namespace reef_estimator
         multiplier = cos(xHat(8));
 
         Eigen::MatrixXd PartialYaw = Eigen::MatrixXd(2,1);
-//        PartialYaw << -xHat(0)*sin(xHat(8))-2*sin(xHat(8))*(cos(pe)*xc + sin(re)*sin(pe)*yc + cos(re)*sin(pe)*zc)*dt,
-//                      -xHat(1)*sin(xHat(8))-2*sin(xHat(8))*(cos(re)*yc - sin(re)*zc)*dt;
           PartialYaw<< -xHat(0)*sin(xHat(8)) - xHat(1)*cos(xHat(8)),
                         xHat(0)*cos(xHat(8)) - xHat(1)*cos(xHat(8));
 
@@ -169,12 +162,11 @@ namespace reef_estimator
 
 
         P = P + (F*P.transpose() + P*F.transpose() + G*Q*G.transpose())*dt;
-//        P = F*P*F.transpose() + G*Q*G.transpose();
 
          distance = sqrt(pow(xHat(6),2) + pow(xHat(7),2));
     }
 
-    void XYEstimator::resetLandingState()
+    void XYEstimator::resetLandingState() // @Humberto; what is going on here?
     {
         //Reset covariance P
         P = P0;
@@ -185,6 +177,21 @@ namespace reef_estimator
         //Reset velocity estimate
         xHat = xHat0;
         xHat(8) = psi;
+    }
+
+    void XYEstimator::updateGPSState(Eigen::Vector3d z){
+
+        Eigen::MatrixXd H_GPS(3,9);
+        H_GPS <<  1, 0, 0, 0, 0, 0, 0, 0, 0,
+                0, 1, 0, 0, 0, 0, 0, 0, 0,
+                0, 0, 0, 0, 0, 0, 0, 0, 1;
+
+        Eigen::MatrixXd S;
+        S = (H_GPS*P*H_GPS.transpose() + R_GPS);
+        K = P*H.transpose()* S.inverse();
+        xHat = xHat + K*(z - H*xHat);
+        P = (I - K*H)*P;
+
     }
 
     /* Implementation of propagate and update is not here, but

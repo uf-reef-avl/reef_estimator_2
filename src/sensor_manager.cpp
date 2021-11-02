@@ -41,7 +41,6 @@ namespace reef_estimator
 
         //Initialize subscribers with corresponding callbacks.
         imu_subscriber_ = nh_.subscribe("imu/data", 10, &SensorManager::imuCallback, this);
-        //mag_subscriber_ = nh_.subscribe("mag/data", 10, &SensorManager::magCallback, this);
 
     }
 
@@ -52,14 +51,6 @@ namespace reef_estimator
         //Pass the imu message to estimator.
         xyzEst.sensorUpdate(*msg);
     }
-    
-    ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-   /* void SensorManager::magCallback(const sensor_msgs::MagneticFieldConstPtr &msg)
-    {
-    	//Pass the magnetic field data to the estimator.
-    	xyzEst.sensorUpdate(*msg);
-    }
-*/    ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
     void SensorManager::rcRawCallback(const rosflight_msgs::RCRawConstPtr &msg) {
         //Check for toggled mocap RC switch
@@ -118,20 +109,18 @@ namespace reef_estimator
         }
     }
 
-void SensorManager::altimeterCallback(const sensor_msgs::RangeConstPtr &msg)
-{
-    xyzEst.sensorUpdate(*msg);
-
-    if (xyzEst.debug_mode_)
+    void SensorManager::altimeterCallback(const sensor_msgs::RangeConstPtr &msg)
     {
-        //Publish the negative range measurement
-        range_msg_ned = *msg;
-        range_msg_ned.header.stamp = range_msg_ned.header.stamp;
-        range_msg_ned.range = -range_msg_ned.range;
-        range_ned_publisher_.publish(range_msg_ned);
+        xyzEst.sensorUpdate(*msg);
+
+        if (xyzEst.debug_mode_)
+        {
+            //Publish the negative range measurement
+            range_msg_ned = *msg;
+            range_msg_ned.header.stamp = range_msg_ned.header.stamp;
+            range_msg_ned.range = -range_msg_ned.range;
+            range_ned_publisher_.publish(range_msg_ned);
+        }
     }
-}
-
-
 
 }
