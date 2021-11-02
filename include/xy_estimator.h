@@ -49,6 +49,15 @@ namespace reef_estimator
         double theta;
         double psi;
         double distance;
+
+        enum StateIndicies
+        {
+            U,   V,       // Velocity (body frame)
+            BWX, BWY,      // Gyro Biases
+            BAX, BAY,       // Accel Biases
+            PX,  PY, YAW     // Position (body wrt world frame)
+        };
+
     };
 }
 

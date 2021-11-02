@@ -87,8 +87,8 @@ namespace reef_estimator
                 ROS_INFO_STREAM("GOT MY FIRST MOCAP MESSAGE");
                 double roll, pitch, yaw;
                 reef_msgs::roll_pitch_yaw_from_quaternion(pose_msg->pose.orientation,roll, pitch, yaw);
-                xyEst.xHat0(0) = pose_msg->pose.position.x;
-                xyEst.xHat0(1) = pose_msg->pose.position.y;
+                xyEst.xHat0(6) = pose_msg->pose.position.x;
+                xyEst.xHat0(7) = pose_msg->pose.position.y;
                 xyEst.xHat0(8) = yaw;
             }
         }
@@ -199,8 +199,6 @@ namespace reef_estimator
         zEst.u(0) = accelxyz_in_NED_frame(2) + initialAccMagnitude; //We need to take avg from csv file to get a better g.
         //        zEst.u(0) = accelxyz_in_NED_frame(2) + initialAccMagnitude + zEst.xHat(2); //We need to take avg from csv file to get a better g.
 
-
-
         //Finally propagate.
         xyEst.nonlinearPropagation(C_NED_to_body_frame, initialAccMagnitude, accelxyz_in_body_frame, gyroxyz_in_body_frame, zEst.xHat(2));
         zEst.updateLinearModel();//@Humberto: should this line and 206 come before 204 (look at last argument)?
@@ -309,7 +307,6 @@ namespace reef_estimator
     void XYZEstimator::mocapUpdate(geometry_msgs::PoseStamped pose_msg) 
     {
 
-
         if (useMocapZ) 
         {
             if (chi2AcceptMocapZ(pose_msg.pose.position.z)) // @Humberto, what is going on here?
@@ -330,7 +327,7 @@ namespace reef_estimator
 
     }
 
-    bool XYZEstimator::chi2Accept(float range_measurement) 
+    bool XYZEstimator::chi2Accept(float range_measurement)
     {
         //Compute Mahalanobis distance.
         range = Eigen::VectorXd(1);

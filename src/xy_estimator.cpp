@@ -64,8 +64,8 @@ namespace reef_estimator
         pitch_bias = xHat(2);
         roll_bias = xHat(3);
 
-        pitch_est = pitch - pitch_bias; // @Humberto: This is currently coming from mocap and not ROSFlight
-        roll_est = roll - roll_bias; // @Humberto: This is currently coming from mocap and not ROSFlight
+        pitch_est = pitch - pitch_bias;
+        roll_est = roll - roll_bias;
 
         C_body_level_to_body_frame << cos(pitch_est),               0,              -sin(pitch_est),
                 sin(roll_est)*sin(pitch_est), cos(roll_est),  sin(roll_est)*cos(pitch_est),
@@ -171,8 +171,6 @@ namespace reef_estimator
         //Reset covariance P
         P = P0;
         reef_msgs::roll_pitch_yaw_from_quaternion(orient0,phi, theta, psi);
-        roll = phi;
-        pitch = theta;
 
         //Reset velocity estimate
         xHat = xHat0;
@@ -182,8 +180,8 @@ namespace reef_estimator
     void XYEstimator::updateGPSState(Eigen::Vector3d z){
 
         Eigen::MatrixXd H_GPS(3,9);
-        H_GPS <<  1, 0, 0, 0, 0, 0, 0, 0, 0,
-                0, 1, 0, 0, 0, 0, 0, 0, 0,
+        H_GPS <<  0, 0, 0, 0, 0, 0, 1, 0, 0,
+                0, 0, 0, 0, 0, 0, 0, 1, 0,
                 0, 0, 0, 0, 0, 0, 0, 0, 1;
 
         Eigen::MatrixXd S;
