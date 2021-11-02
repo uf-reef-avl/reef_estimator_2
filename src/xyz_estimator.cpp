@@ -121,10 +121,6 @@ namespace reef_estimator
         takeoffState.data = false;
         zSigma(0) = zSigma(1) = 0;
 
-	// Initialize a flag for velocity measurements, since we are wanting deltas need at least 2 mocap measurements to update
-	mocap_flag = false;
-	
-	
     }
 
     XYZEstimator::~XYZEstimator() {}
@@ -269,22 +265,12 @@ namespace reef_estimator
     }
 
     //Mocap XY Pose update
-    void XYZEstimator::deltaPoseUpdate(geometry_msgs::Pose pose_msg)
-    {
-
-        if (chi2AcceptDeltaPose(pose_msg))
-        {
-            x_z_plus = pose_msg.position.x;
-            xyEst.z(0) = x_z_plus - x_z_minus;
-            x_z_minus = x_z_plus;
-
-            y_z_plus = pose_msg.position.y;
-            xyEst.z(1) = y_z_plus - y_z_minus;
-            y_z_minus = y_z_plus;
-
+    void XYZEstimator::deltaPoseUpdate(geometry_msgs::Pose pose_msg){
+        if (chi2AcceptDeltaPose(pose_msg)){
+            xyEst.z(0) = pose_msg.position.x;
+            xyEst.z(1) = pose_msg.position.y;;
             newRgbdMeasurement = true;
         }
-
     }
 
     bool XYZEstimator::chi2Accept(float range_measurement) 
@@ -314,8 +300,7 @@ namespace reef_estimator
         }
     }
 
-    bool XYZEstimator::chi2AcceptDeltaPose(geometry_msgs::Pose pose)
-    {
+    bool XYZEstimator::chi2AcceptDeltaPose(geometry_msgs::Pose pose){
         //Compute Mahalanobis distance.
         Eigen::Vector2d measurement;
         measurement << pose.position.x, pose.position.y;
