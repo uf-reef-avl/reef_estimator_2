@@ -81,9 +81,6 @@ namespace reef_estimator
         double dPoseLimit;
         double dYawLimit;
         double dTimeLimit;
-
-        double currentTime;
-        double previousTime;
         
         bool want_delta;
         

@@ -11,7 +11,6 @@ namespace reef_estimator
     XYEstimator::XYEstimator() : Estimator()
     {
         resetCount = 1;
-        dt = 0.002;
 
         //Initial state
         F = Eigen::MatrixXd(12,12);
@@ -51,16 +50,10 @@ namespace reef_estimator
 
         //Beta values for partial update
         betaVector = Eigen::MatrixXd(12,1);
-
-        geometry_msgs::Quaternion orient2;
-
         distance = 0.;
-
         phi = 0.;
         theta = 0.;
         psi = 0.;
-
-        previousTime = ros::Time::now().toSec();
 
         relativeReset_publisher_ = nh_.advertise<geometry_msgs::Vector3>("deltaState", 1, true);
     }
@@ -153,8 +146,8 @@ namespace reef_estimator
                 -cos(re) * sin(pe) * yc + sin(re) * sin(pe) * zc,
                 0, sin(re) * yc + cos(re) * zc;
 
-        double multiplier;
-        multiplier = cos(xHat(8));
+//        double multiplier;
+//        multiplier = cos(xHat(8));
 
         Eigen::MatrixXd PartialYaw = Eigen::MatrixXd(2, 1);
 
@@ -178,30 +171,17 @@ namespace reef_estimator
                 zeros2x2, zeros2x2, zeros2x2, C_body_level_to_body_frame_2x2.transpose() * PartialVel, zeros2x1,
                 zeros1x2, zeros1x2, zeros1x2, zeros1x2, 1;
 
-//        C_body_level_to_body_frame_2x2.transpose(),             zeros2x2,                          zeros2x2,                        zeros2x2,                         zeros2x1,
-//                zeros2x2,                       Id.setIdentity(2,2),              zeros2x2,                        zeros2x2,                         zeros2x1,
-//                zeros2x2,                                zeros2x2,                    Id.setIdentity(2,2),         zeros2x2,                         zeros2x1,
-//                zeros2x2,                                zeros2x2,                          zeros2x2,          C_body_level_to_body_frame_2x2.transpose(),     zeros2x1,
-//                zeros1x2,                                zeros1x2,                          zeros1x2,                        zeros1x2,               1;
-
-
         P = P + (F * P.transpose() + P * F.transpose() + G * Q * G.transpose()) * dt;
 //        P = F*P*F.transpose() + G*Q*G.transpose();
 
         distance = sqrt(pow(xHat(6), 2) + pow(xHat(7), 2));
-        currentTime = ros::Time::now().toSec();
 
         if (XYTakeoff && distance > dPoseLimit) {
             XYEstimator::relativeReset(xHat, P);
         } else if (XYTakeoff && (xHat(8) - lastYaw) > dYawLimit) {
             XYEstimator::relativeReset(xHat, P);
         }
-  /* TIME CONSTRAINT: shouldn't be necessary but can implement, error with current version so left out */
-//         else if(XYTakeoff && (currentTime - previousTime) > dTimeLimit){
-//             XYEstimator::relativeReset(xHat, P);
-//             previousTime = ros::Time::now().toSec();
-//         }
-
+        // @humberto/Grant what is happening here?
         if (resetCount <= 2) {
             global_x = xHat(6);
             global_y = xHat(7);
@@ -255,7 +235,7 @@ namespace reef_estimator
             global_y = xHat(7);
             global_yaw = xHat(8);
         }
-        else{
+        else{ //Are we sure that Xhat and Global_x are in the right frame?
             global_x = global_x + xHat(6) - lastX;
             global_y = global_y + xHat(7) - lastY;
             global_yaw = psi;

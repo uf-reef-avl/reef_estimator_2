@@ -268,7 +268,9 @@ namespace reef_estimator
     void XYZEstimator::deltaPoseUpdate(geometry_msgs::Pose pose_msg){
         if (chi2AcceptDeltaPose(pose_msg)){
             xyEst.z(0) = pose_msg.position.x;
-            xyEst.z(1) = pose_msg.position.y;;
+            xyEst.z(1) = pose_msg.position.y;
+            double yaw = reef_msgs::get_yaw(pose_msg.orientation);
+            xyEst.z(2) = yaw;
             newRgbdMeasurement = true;
         }
     }
