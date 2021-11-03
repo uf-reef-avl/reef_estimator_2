@@ -13,16 +13,10 @@
 #include <geometry_msgs/PoseStamped.h>
 #include <geometry_msgs/TwistStamped.h>
 #include <geometry_msgs/TwistWithCovarianceStamped.h>
+#include <nav_msgs/Odometry.h>
 #include <reef_msgs/XYZDebugEstimate.h>
 #include <reef_msgs/XYZEstimate.h>
 #include <reef_msgs/DeltaToVel.h>
-
-/////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-#include <sensor_msgs/MagneticField.h>
-
-#include "MatrixExponential.h"
-
-/////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "z_estimator.h"
 #include "xy_estimator.h"
@@ -47,11 +41,7 @@ namespace reef_estimator
         ros::Publisher state_publisher_;
         ros::Publisher debug_state_publisher_;
         ros::Publisher is_flying_publisher_;
-/////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-	ros::Publisher yaw_publisher_;
-/////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-
+        ros::Publisher pose_publisher_;
         //Estimator enable/disable variables
         bool enableXY;
         bool enableZ;
@@ -136,34 +126,6 @@ namespace reef_estimator
         void mocapUpdate(geometry_msgs::PoseStamped pose_msg);
         void mocapUpdate(geometry_msgs::TwistWithCovarianceStamped twist_msg);
         void rgbdUpdate(reef_msgs::DeltaToVel twist_msg);
-        
-///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////        
-        
-        Eigen::MatrixXd imu_gyro;
-        
-        Eigen::MatrixXd w_last;
-        Eigen::MatrixXd w0;
-        Eigen::MatrixXd w;
-        
-        Eigen::MatrixXd q0;
-        Eigen::MatrixXd q;
-        Eigen::MatrixXd q_dot;
-        
-        double q1;	// x
-        double q2;	// y
-        double q3;	// z
-        double q4;	// w
-        
-        
-        double psi_imu;
-        
-        
-        void gyro_to_orientation_disc(Eigen::MatrixXd imu_gyro, Eigen::MatrixXd &q, double dt, Eigen::MatrixXd &w_last);
-        Eigen::MatrixXd omega_generator(double a, double b, double c);
-        double yaw_calc_imu(double q1, double q2, double q3, double q4);
-        void sensorUpdate(sensor_msgs::MagneticField mag_msg);    
-        
-  /////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////      
 
         };
 

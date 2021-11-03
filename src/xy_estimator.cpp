@@ -177,7 +177,7 @@ namespace reef_estimator
         xHat(8) = psi;
     }
 
-    void XYEstimator::updateGPSState(Eigen::Vector3d z){
+    void XYEstimator::updateGPSState(Eigen::Vector3d z_gps){
 
         Eigen::MatrixXd H_GPS(3,9);
         H_GPS <<  0, 0, 0, 0, 0, 0, 1, 0, 0,
@@ -185,10 +185,12 @@ namespace reef_estimator
                 0, 0, 0, 0, 0, 0, 0, 0, 1;
 
         Eigen::MatrixXd S;
+        Eigen::MatrixXd K_gps;
+
         S = (H_GPS*P*H_GPS.transpose() + R_GPS);
-        K = P*H.transpose()* S.inverse();
-        xHat = xHat + K*(z - H*xHat);
-        P = (I - K*H)*P;
+        K_gps = P*H_GPS.transpose()* S.inverse();
+        xHat = xHat + K_gps*(z_gps - H_GPS*xHat);
+        P = (I - K_gps*H_GPS)*P;
 
     }
 

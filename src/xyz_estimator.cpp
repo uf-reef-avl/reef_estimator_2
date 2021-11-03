@@ -74,7 +74,7 @@ namespace reef_estimator
         reef_msgs::importMatrixFromParamServer(private_nh_, xyEst.Q, "xy_Q");
         reef_msgs::importMatrixFromParamServer(private_nh_, xyEst.R0, "xy_R0");
         reef_msgs::importMatrixFromParamServer(private_nh_, xyEst.betaVector, "xy_beta");
-        reef_msgs::importMatrixFromParamServer(private_nh_, xyEst.R_GPS, "R_GPS");
+        reef_msgs::importMatrixFromParamServer(private_nh_, xyEst.R_GPS, "xy_RGPS");
         xyEst.Q *= (xyEst.dt*xyEst.dt);
 
         private_nh_.param<bool>("initialize_with_mocap", initialize_with_mocap, true);
@@ -82,7 +82,7 @@ namespace reef_estimator
             std::string mocapPoseTopic;
             private_nh_.param<std::string>("mocap_pose_topic", mocapPoseTopic, "mocap_ned");
             geometry_msgs::PoseStampedConstPtr pose_msg;
-            pose_msg = ros::topic::waitForMessage<geometry_msgs::PoseStamped>(mocapPoseTopic, nh_);
+            pose_msg = ros::topic::waitForMessage<geometry_msgs::PoseStamped>("pose_stamped", nh_);
             if (pose_msg != NULL) {
                 ROS_INFO_STREAM("GOT MY FIRST MOCAP MESSAGE");
                 double roll, pitch, yaw;
@@ -126,6 +126,7 @@ namespace reef_estimator
         }
         
         is_flying_publisher_ = nh_.advertise<std_msgs::Bool>("is_flying_reef", 1, true);
+        pose_publisher_ = nh_.advertise<nav_msgs::Odometry>("quad_pose",1);
 
         //Initialize member variables
         accSampleAverage.x = accSampleAverage.y = accSampleAverage.z = 0;
@@ -316,13 +317,14 @@ namespace reef_estimator
             }
         }
         bool enable_gps;
-        private_nh_.param<bool>("enable_gps", enable_gps, false);
+        nh_.param<bool>("/gps_measurement", enable_gps, false);
         if(enable_gps) {
 
             ROS_INFO_STREAM("Updating States!");
             double roll, pitch, yaw;
             reef_msgs::roll_pitch_yaw_from_quaternion(pose_msg.pose.orientation,roll, pitch, yaw);
             xyEst.updateGPSState(Eigen::Vector3d(pose_msg.pose.position.x,pose_msg.pose.position.y, yaw ));
+            nh_.setParam("/gps_measurement", false);
         }
 
     }
@@ -536,14 +538,20 @@ namespace reef_estimator
         xyzDebugState.xy_minus.roll_bias = xyEst.xHat(3);
         xyzDebugState.xy_minus.xa_bias = xyEst.xHat(4);
         xyzDebugState.xy_minus.ya_bias = xyEst.xHat(5);
+        xyzDebugState.xy_minus.x = xyEst.xHat(6);
+        xyzDebugState.xy_minus.y = xyEst.xHat(7);
+        xyzDebugState.xy_minus.yaw = xyEst.xHat(8);
 
-        xySigma = Eigen::MatrixXd(6, 1);
+        xySigma = Eigen::MatrixXd(9, 1);
         xySigma(0) = 3 * sqrt(xyEst.P(0, 0));
         xySigma(1) = 3 * sqrt(xyEst.P(1, 1));
         xySigma(2) = 3 * sqrt(xyEst.P(2, 2));
         xySigma(3) = 3 * sqrt(xyEst.P(3, 3));
         xySigma(4) = 3 * sqrt(xyEst.P(4, 4));
         xySigma(5) = 3 * sqrt(xyEst.P(5, 5));
+        xySigma(6) = 3 * sqrt(xyEst.P(6, 6));
+        xySigma(7) = 3 * sqrt(xyEst.P(7, 7));
+        xySigma(8) = 3 * sqrt(xyEst.P(8, 8));
         xyzDebugState.xy_minus.sigma_plus[0] = xyzDebugState.xy_minus.x_dot + xySigma(0);
         xyzDebugState.xy_minus.sigma_minus[0] = xyzDebugState.xy_minus.x_dot - xySigma(0);
         xyzDebugState.xy_minus.sigma_plus[1] = xyzDebugState.xy_minus.y_dot + xySigma(1);
@@ -556,6 +564,12 @@ namespace reef_estimator
         xyzDebugState.xy_minus.sigma_minus[4] = xyzDebugState.xy_minus.xa_bias - xySigma(4);
         xyzDebugState.xy_minus.sigma_plus[5] = xyzDebugState.xy_minus.ya_bias + xySigma(5);
         xyzDebugState.xy_minus.sigma_minus[5] = xyzDebugState.xy_minus.ya_bias - xySigma(5);
+        xyzDebugState.xy_minus.sigma_plus[6] = xyzDebugState.xy_minus.ya_bias + xySigma(6);
+        xyzDebugState.xy_minus.sigma_minus[6] = xyzDebugState.xy_minus.ya_bias - xySigma(6);
+        xyzDebugState.xy_minus.sigma_plus[7] = xyzDebugState.xy_minus.ya_bias + xySigma(7);
+        xyzDebugState.xy_minus.sigma_minus[7] = xyzDebugState.xy_minus.ya_bias - xySigma(7);
+        xyzDebugState.xy_minus.sigma_plus[8] = xyzDebugState.xy_minus.ya_bias + xySigma(8);
+        xyzDebugState.xy_minus.sigma_minus[9] = xyzDebugState.xy_minus.ya_bias - xySigma(8);
 
         //Z estimator publisher block------------------------------------------
         xyzDebugState.z_minus.z = zEst.xHat(0, 0);
@@ -588,9 +602,25 @@ namespace reef_estimator
 
         state_publisher_.publish(xyzState);
 
+        nav_msgs::Odometry nav_msg;
+        nav_msg.header = xyzState.header;
+        nav_msg.pose.pose.position.x = xyEst.xHat(6);
+        nav_msg.pose.pose.position.x = xyEst.xHat(7);
+        nav_msg.pose.pose.position.x = zEst.xHat(0);
+
+        double roll, pitch, yaw;
+        reef_msgs::roll_pitch_yaw_from_rotation321(C_NED_to_body_frame, roll, pitch, yaw);
+        roll += xyEst.xHat(3);
+        pitch += xyEst.xHat(2);
+        yaw = xyEst.xHat(8); // TODO: Change this to integrate gyro measurements
+        //TODO: convert this to quaternions using REEF_msgs
+
+        nav_msg.twist.twist.linear.x = xyEst.xHat(0);
+        nav_msg.twist.twist.linear.y = xyEst.xHat(1);
+        nav_msg.twist.twist.linear.z = zEst.xHat(1);
+
         if (debug_mode_)
         {
-
             //XY filter debug variables
             xyzDebugState.xy_plus.x_dot = xyEst.xHat(0);
             xyzDebugState.xy_plus.y_dot = xyEst.xHat(1);
@@ -598,13 +628,19 @@ namespace reef_estimator
             xyzDebugState.xy_plus.roll_bias = xyEst.xHat(3);
             xyzDebugState.xy_plus.xa_bias = xyEst.xHat(4);
             xyzDebugState.xy_plus.ya_bias = xyEst.xHat(5);
-            xySigma = Eigen::MatrixXd(6, 1);
+            xyzDebugState.xy_plus.x = xyEst.xHat(6);
+            xyzDebugState.xy_plus.y = xyEst.xHat(7);
+            xyzDebugState.xy_plus.yaw = xyEst.xHat(8);
+            xySigma = Eigen::MatrixXd(9, 1);
             xySigma(0) = 3 * sqrt(xyEst.P(0, 0));
             xySigma(1) = 3 * sqrt(xyEst.P(1, 1));
             xySigma(2) = 3 * sqrt(xyEst.P(2, 2));
             xySigma(3) = 3 * sqrt(xyEst.P(3, 3));
             xySigma(4) = 3 * sqrt(xyEst.P(4, 4));
             xySigma(5) = 3 * sqrt(xyEst.P(5, 5));
+            xySigma(6) = 3 * sqrt(xyEst.P(6, 6));
+            xySigma(7) = 3 * sqrt(xyEst.P(7, 7));
+            xySigma(8) = 3 * sqrt(xyEst.P(8, 8));
             xyzDebugState.xy_plus.sigma_plus[0] = xyzDebugState.xy_plus.x_dot + xySigma(0);
             xyzDebugState.xy_plus.sigma_minus[0] = xyzDebugState.xy_plus.x_dot - xySigma(0);
             xyzDebugState.xy_plus.sigma_plus[1] = xyzDebugState.xy_plus.y_dot + xySigma(1);
@@ -617,6 +653,12 @@ namespace reef_estimator
             xyzDebugState.xy_plus.sigma_minus[4] = xyzDebugState.xy_plus.xa_bias - xySigma(4);
             xyzDebugState.xy_plus.sigma_plus[5] = xyzDebugState.xy_plus.ya_bias + xySigma(5);
             xyzDebugState.xy_plus.sigma_minus[5] = xyzDebugState.xy_plus.ya_bias - xySigma(5);
+            xyzDebugState.xy_plus.sigma_plus[6] = xyzDebugState.xy_plus.ya_bias + xySigma(6);
+            xyzDebugState.xy_plus.sigma_minus[6] = xyzDebugState.xy_plus.ya_bias - xySigma(6);
+            xyzDebugState.xy_plus.sigma_plus[7] = xyzDebugState.xy_plus.ya_bias + xySigma(7);
+            xyzDebugState.xy_plus.sigma_minus[7] = xyzDebugState.xy_plus.ya_bias - xySigma(7);
+            xyzDebugState.xy_plus.sigma_plus[8] = xyzDebugState.xy_plus.ya_bias + xySigma(8);
+            xyzDebugState.xy_plus.sigma_minus[8] = xyzDebugState.xy_plus.ya_bias - xySigma(8);
 
             //Z filter debug variables
             xyzDebugState.z_plus.z = zEst.xHat(0);
