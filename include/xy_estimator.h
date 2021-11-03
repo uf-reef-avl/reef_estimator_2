@@ -7,6 +7,7 @@
 
 #include "estimator.h"
 #include "../../reef_msgs/include/reef_msgs/dynamics.h"
+#include <std_msgs/Empty.h>
 
 
 namespace reef_estimator
@@ -83,7 +84,13 @@ namespace reef_estimator
         double dTimeLimit;
         
         bool want_delta;
-        
+        enum StateIndicies
+        {   U,   V,
+            BR, BP,
+            BAX, BAY,
+            PX,  PY, YAW,
+            BGX, BGY,BGZ
+        };
     };
 }
 

@@ -266,6 +266,7 @@ namespace reef_estimator
 
     //Mocap XY Pose update
     void XYZEstimator::deltaPoseUpdate(geometry_msgs::Pose pose_msg){
+        // TODO: Humberto please do all the coordinate frame transforms. It needs to go before chi2 rejection
         if (chi2AcceptDeltaPose(pose_msg)){
             xyEst.z(0) = pose_msg.position.x;
             xyEst.z(1) = pose_msg.position.y;
@@ -418,6 +419,8 @@ namespace reef_estimator
 
     void XYZEstimator::saveMinusState()
     {
+        // TODO: Humberto/Grant: Publish the integrated position as a geometry_msg/PoseStamped
+        // TODO: Humberto/Grant: Publish the xyz_estimate with position and velocity here
         //XY estimator publisher block------------------------------------------
         xyzDebugState.xy_minus.x_dot = xyEst.xHat(0);
         xyzDebugState.xy_minus.y_dot = xyEst.xHat(1);
@@ -465,6 +468,8 @@ namespace reef_estimator
 
     void XYZEstimator::publishEstimates()
     {
+        // TODO: Humberto/Grant: Publish the integrated position as a geometry_msg/PoseStamped
+        // TODO: Humberto/Grant: Publish the xyz_estimate with position and velocity here
         //Publish XY and Z states
         xyzState.xy_plus.x_dot = xyEst.xHat(0);
         xyzState.xy_plus.y_dot = xyEst.xHat(1);

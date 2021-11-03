@@ -26,7 +26,7 @@ namespace reef_estimator
         P = Eigen::MatrixXd(12,12);
         I = Eigen::MatrixXd(12,12);
         I.setIdentity();
-        K = Eigen::MatrixXd(12,2);
+        K = Eigen::MatrixXd(12,3);
         K.setZero();
 
         z = Eigen::MatrixXd(3,1);
@@ -223,6 +223,10 @@ namespace reef_estimator
 
     void XYEstimator::relativeReset(Eigen::MatrixXd &xHat, Eigen::MatrixXd &P){
 
+        //TODO: Grant/Humberto: Fix this
+
+        ros::Publisher keyframe_now = nh_.advertise<std_msgs::Empty>("keyframe_now",1);
+
         // Publish current position and heading to topic to be read from backend compiler here (reset to zero after)
         Delta.x = xHat(6);
         Delta.y = xHat(7);
@@ -231,11 +235,11 @@ namespace reef_estimator
         reef_msgs::roll_pitch_yaw_from_quaternion(orient0,phi, theta, psi);
 
         if(resetCount <= 2){
-            global_x = xHat(6);
-            global_y = xHat(7);
+            global_x = xHat(PX);
+            global_y = xHat(PY);
             global_yaw = xHat(8);
         }
-        else{ //Are we sure that Xhat and Global_x are in the right frame?
+        else{ //TODO: Humberto/Grant, Are we sure that Xhat and Global_x are in the right frame?
             global_x = global_x + xHat(6) - lastX;
             global_y = global_y + xHat(7) - lastY;
             global_yaw = psi;
