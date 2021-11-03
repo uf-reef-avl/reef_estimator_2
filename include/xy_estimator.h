@@ -31,6 +31,7 @@ namespace reef_estimator
         Eigen::Matrix3d C_body_level_to_body_frame ;
         Eigen::Vector3d nonLinearDynamics;
         Eigen::Matrix2d Id;
+        Eigen::Affine3d global_pose;
         
         // orientation variables 
         double pitch;

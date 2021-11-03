@@ -56,6 +56,7 @@ namespace reef_estimator
         psi = 0.;
 
         relativeReset_publisher_ = nh_.advertise<geometry_msgs::Vector3>("deltaState", 1, true);
+        global_pose.setIdentity();
     }
 
     XYEstimator::~XYEstimator(){}
@@ -127,12 +128,25 @@ namespace reef_estimator
 
 
         //Now compute th Jacobian F for the non-linear dynamics. After this, we compute the predict the covariance.
-        Eigen::Matrix2d zeros2x2;
+        Eigen::MatrixXd zeros2x2 = Eigen::MatrixXd(2, 2);
         zeros2x2.setZero();
         Eigen::MatrixXd zeros2x1 = Eigen::MatrixXd(2, 1);
         zeros2x1.setZero();
         Eigen::MatrixXd zeros1x2 = Eigen::MatrixXd(1, 2);
         zeros1x2.setZero();
+        Eigen::MatrixXd zeros2x3 = Eigen::MatrixXd(2, 3);
+        zeros2x3.setZero();
+        Eigen::MatrixXd zeros3x12 = Eigen::MatrixXd(3, 12);
+        zeros3x12.setZero();
+        Eigen::MatrixXd zeros1x3 = Eigen::MatrixXd(1, 3);
+        zeros1x3.setZero();
+        Eigen::MatrixXd zeros3x2 = Eigen::MatrixXd(3, 2);
+        zeros3x2.setZero();
+        Eigen::MatrixXd zeros3x3 = Eigen::MatrixXd(3, 3);
+        zeros3x3.setZero();
+        Eigen::MatrixXd zeros1x1 = Eigen::MatrixXd(1, 1);
+        zeros1x1.setZero();
+
 
         //xc and yc are just coefficients used in the Jacobian for clarity.
         xc = input_to_system_in_body_frame(0);
@@ -141,52 +155,53 @@ namespace reef_estimator
         pe = pitch_est;
         re = roll_est;
 
-        Eigen::Matrix2d partialC_partialBiasAttitude;
-        partialC_partialBiasAttitude << sin(pe) * xc - sin(re) * cos(pe) * yc - cos(re) * cos(pe) * zc,
-                -cos(re) * sin(pe) * yc + sin(re) * sin(pe) * zc,
-                0, sin(re) * yc + cos(re) * zc;
+        Eigen::MatrixXd partialC_partialBiasAttitude = Eigen::MatrixXd(2,2);
+        partialC_partialBiasAttitude << sin(pe) * xc - sin(re) * cos(pe) * yc - cos(re) * cos(pe) * zc, -cos(re) * sin(pe) * yc + sin(re) * sin(pe) * zc,
+                                         0.0, sin(re) * yc + cos(re) * zc;
 
-//        double multiplier;
-//        multiplier = cos(xHat(8));
+        Eigen::MatrixXd PartialYawPartialBiasAttitude = Eigen::MatrixXd(1,2);
+        PartialYawPartialBiasAttitude << -cos(pe)*cos(re)*(gyroxyz_in_body_frame(1) + xHat(BGY)) + sin(re)*cos(pe)*(gyroxyz_in_body_frame(2) +xHat(BGZ)),
+        cos(pe)*(gyroxyz_in_body_frame(0) + xHat(BGX)) + sin(re)*sin(pe)*(gyroxyz_in_body_frame(1) +xHat(BGY)) + cos(re)*sin(pe)*(gyroxyz_in_body_frame(2) + xHat(BGZ));
+
+        Eigen::MatrixXd PartialYawPartialGyroBias = Eigen::MatrixXd(1,3);
+        PartialYawPartialGyroBias << -sin(pe), sin(re)*cos(pe), cos(re)*cos(pe);
 
         Eigen::MatrixXd PartialYaw = Eigen::MatrixXd(2, 1);
-
         PartialYaw << -xHat(0) * sin(xHat(8)) - xHat(1) * cos(xHat(8)),
                 xHat(0) * cos(xHat(8)) - xHat(1) * sin(xHat(8));
 
-        Eigen::Matrix2d PartialVel;
+        Eigen::MatrixXd PartialVel = Eigen::MatrixXd(2, 2);
         PartialVel << cos(xHat(8)), -sin(xHat(8)),
-                sin(xHat(8)), cos(xHat(8));
-
-        F << zeros2x2, partialC_partialBiasAttitude, C_body_level_to_body_frame_2x2.transpose(), zeros2x2, zeros2x1,
-                zeros2x2, zeros2x2, zeros2x2, zeros2x2, zeros2x1,
-                zeros2x2, zeros2x2, zeros2x2, zeros2x2, zeros2x1,
-                PartialVel, zeros2x2, zeros2x2, zeros2x2, PartialYaw,
-                zeros1x2, zeros1x2, zeros1x2, zeros1x2, 0;
+                      sin(xHat(8)), cos(xHat(8));
 
 
-        G << C_body_level_to_body_frame_2x2.transpose(), zeros2x2, zeros2x2, zeros2x2, zeros2x1,
-                zeros2x2, Id.setIdentity(2, 2), zeros2x2, zeros2x2, zeros2x1,
-                zeros2x2, zeros2x2, Id.setIdentity(2, 2), zeros2x2, zeros2x1,
-                zeros2x2, zeros2x2, zeros2x2, C_body_level_to_body_frame_2x2.transpose() * PartialVel, zeros2x1,
-                zeros1x2, zeros1x2, zeros1x2, zeros1x2, 1;
+        F << zeros2x2, partialC_partialBiasAttitude, C_body_level_to_body_frame_2x2.transpose(), zeros2x2, zeros2x1,zeros2x3, //velocity
+                zeros2x2, zeros2x2, zeros2x2, zeros2x2, zeros2x1, zeros2x3, //attitude bias
+                zeros2x2, zeros2x2, zeros2x2, zeros2x2, zeros2x1, zeros2x3,//accel bias
+                PartialVel, zeros2x2, zeros2x2, zeros2x2, PartialYaw, zeros2x3,//position xy
+                zeros1x2, PartialYawPartialBiasAttitude, zeros1x2, zeros1x2, zeros1x1, PartialYawPartialGyroBias,//yaw
+                zeros3x12;
+
+
+        G << C_body_level_to_body_frame_2x2.transpose(), zeros2x2, zeros2x2, zeros2x3, zeros2x3,
+                zeros2x2, Id.setIdentity(2, 2), zeros2x2, zeros2x3, zeros2x3,
+                zeros2x2, zeros2x2, Id.setIdentity(2, 2), zeros2x3, zeros2x3,
+                zeros2x2, zeros2x2, zeros2x2, zeros2x3, zeros2x3,
+                zeros1x2, zeros1x2, zeros1x2, -sin(pe), sin(re)*cos(pe), cos(re)*cos(pe), zeros1x3,
+                zeros3x2, zeros3x2, zeros3x2, zeros3x3, Eigen::MatrixXd::Identity(3,3) ;
+
+
 
         P = P + (F * P.transpose() + P * F.transpose() + G * Q * G.transpose()) * dt;
 //        P = F*P*F.transpose() + G*Q*G.transpose();
 
         distance = sqrt(pow(xHat(6), 2) + pow(xHat(7), 2));
 
-        if (XYTakeoff && distance > dPoseLimit) {
-            XYEstimator::relativeReset(xHat, P);
-        } else if (XYTakeoff && (xHat(8) - lastYaw) > dYawLimit) {
+        if (XYTakeoff && distance > dPoseLimit || XYTakeoff && (xHat(8)) > dYawLimit) {
             XYEstimator::relativeReset(xHat, P);
         }
         // @humberto/Grant what is happening here?
-        if (resetCount <= 2) {
-            global_x = xHat(6);
-            global_y = xHat(7);
-            global_yaw = xHat(8);
-        } else {
+
             global_x = global_x + xHat(6) - lastX;
             global_y = global_y + xHat(7) - lastY;
             global_yaw = global_yaw + xHat(8) - lastYaw;
@@ -194,7 +209,7 @@ namespace reef_estimator
             lastX = xHat(6);
             lastY = xHat(7);
             lastYaw = xHat(8);
-        }
+
     }
 
     void XYEstimator::resetLandingState()
@@ -224,49 +239,40 @@ namespace reef_estimator
     void XYEstimator::relativeReset(Eigen::MatrixXd &xHat, Eigen::MatrixXd &P){
 
         //TODO: Grant/Humberto: Fix this
-
+        std_msgs::Empty empty;
         ros::Publisher keyframe_now = nh_.advertise<std_msgs::Empty>("keyframe_now",1);
+        keyframe_now.publish(empty);
+
+        Eigen::Affine3d current_delta;
+        current_delta.translation() = Eigen::Vector3d(xHat(PX), xHat(PY),0);
+        current_delta.linear() = reef_msgs::DCM_from_Euler321(Eigen::Vector3d(0,0,xHat(YAW))).transpose();
+
+        global_pose = global_pose*current_delta;
+
 
         // Publish current position and heading to topic to be read from backend compiler here (reset to zero after)
-        Delta.x = xHat(6);
-        Delta.y = xHat(7);
-        Delta.z = xHat(8) - lastYaw;
+        Delta.x = xHat(PX);
+        Delta.y = xHat(PY);
+        Delta.z = xHat(YAW);
 
-        reef_msgs::roll_pitch_yaw_from_quaternion(orient0,phi, theta, psi);
+//        relativeReset_publisher_.publish(Delta);
 
-        if(resetCount <= 2){
-            global_x = xHat(PX);
-            global_y = xHat(PY);
-            global_yaw = xHat(8);
-        }
-        else{ //TODO: Humberto/Grant, Are we sure that Xhat and Global_x are in the right frame?
-            global_x = global_x + xHat(6) - lastX;
-            global_y = global_y + xHat(7) - lastY;
-            global_yaw = psi;
-        }
+
+        xHat(PX) = 0.;
+        xHat(PY) = 0.;
+        xHat(YAW) = 0;
 
         
+        Eigen::MatrixXd P6 = Eigen::MatrixXd(1,12);
+        Eigen::MatrixXd P7 = Eigen::MatrixXd(1,12);
+        Eigen::MatrixXd P8 = Eigen::MatrixXd(1,12);
+        P6 << 0, 0, 0, 0, 0, 0, P0(6,6), 0, 0, 0, 0, 0;
+        P7 << 0, 0, 0, 0, 0, 0, 0, P0(7,7), 0, 0, 0, 0;
+        P8 << 0, 0, 0, 0, 0, 0, 0, 0, P0(8,8), 0, 0, 0;
 
-        relativeReset_publisher_.publish(Delta);
-
-
-        xHat(6) = 0.;
-        xHat(7) = 0.;
-        xHat(8) = psi;
-        lastYaw = psi;
-        lastX = 0.;
-        lastY = 0.;
-        
-        Eigen::MatrixXd P6 = Eigen::MatrixXd(1,9);
-        Eigen::MatrixXd P7 = Eigen::MatrixXd(1,9);
-        Eigen::MatrixXd P8 = Eigen::MatrixXd(1,9);
-        P6 << 0, 0, 0, 0, 0, 0, P0(6,6), 0, 0;
-        P7 << 0, 0, 0, 0, 0, 0, 0, P0(7,7), 0;
-        P8 << 0, 0, 0, 0, 0, 0, 0, 0, P0(8,8);
-
-        P.block<1,9>(6,0) = P6;
-        P.block<1,9>(7,0) = P7;
-        P.block<1,9>(8,0) = P8;
+        P.block<1,12>(6,0) = P6;
+        P.block<1,12>(7,0) = P7;
+        P.block<1,12>(8,0) = P8;
 
        resetCount++;
     }

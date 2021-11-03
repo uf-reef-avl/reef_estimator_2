@@ -41,10 +41,6 @@ namespace reef_estimator
         ros::Publisher debug_state_publisher_;
         ros::Publisher is_flying_publisher_;
         ros::Publisher pose_publisher_;
-/////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-	ros::Publisher yaw_publisher_;
-/////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
 
         //Estimator enable/disable variables
         bool enableXY;
@@ -84,7 +80,7 @@ namespace reef_estimator
         int numAccSamples, numSonarSamples;
         double accSamples[ACC_SAMPLE_SIZE], sonarSamples[SONAR_SAMPLE_SIZE];
         double accMean, accVariance, sonarMean, sonarVariance;
-        bool newRgbdMeasurement, newSonarMeasurement;
+        bool newDeltaMeasurement, newSonarMeasurement;
         int rgbdCounter;
 
         Eigen::Matrix3d C_NED_to_body_frame;
@@ -97,6 +93,7 @@ namespace reef_estimator
         Eigen::Vector3d Mahalanobis_D_hat;
         Eigen::Vector2d measurement;
         Eigen::Vector2d expected_rgbd;
+        Eigen::Affine3d body_to_camera;
 
         double beta_0;
         Eigen::MatrixXd xySigma;

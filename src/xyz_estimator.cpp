@@ -7,21 +7,21 @@
 namespace reef_estimator
 {
     XYZEstimator::XYZEstimator() : private_nh_("~"),
-    nh_(""),
-    numberOfPropagations(0),
-    accInitialized(false),
-    accInitSampleCount(0),
-    numAccSamples(0),
-    numSonarSamples(0),
-    accMean(0),
-    accVariance(0),
-    sonarMean(0),
-    sonarVariance(0),
-    sonarTakeoffState(false),
-    accTakeoffState(false),
-    newSonarMeasurement(false),
-    newRgbdMeasurement(false),
-    rgbdCounter(0)
+                                   nh_(""),
+                                   numberOfPropagations(0),
+                                   accInitialized(false),
+                                   accInitSampleCount(0),
+                                   numAccSamples(0),
+                                   numSonarSamples(0),
+                                   accMean(0),
+                                   accVariance(0),
+                                   sonarMean(0),
+                                   sonarVariance(0),
+                                   sonarTakeoffState(false),
+                                   accTakeoffState(false),
+                                   newSonarMeasurement(false),
+                                   newDeltaMeasurement(false),
+                                   rgbdCounter(0)
     {
         private_nh_.param<bool>("debug_mode", debug_mode_, false);
         if (debug_mode_) {
@@ -93,6 +93,9 @@ namespace reef_estimator
         zEst.updateLinearModel();
         zEst.initialize();
         zEst.setTakeoffState(false);
+
+        reef_msgs::loadTransform("body_to_camera",body_to_camera);
+        ROS_WARN_STREAM("[REEF EST]:: Body to camera \n" << body_to_camera.matrix());
         
         state_publisher_ = nh_.advertise<reef_msgs::XYZEstimate>("xyz_estimate", 1, true);
         pose_publisher_ =  nh_.advertise<geometry_msgs::PoseStamped>("xyz_pose", 1, true);
@@ -224,13 +227,13 @@ namespace reef_estimator
             numberOfPropagations = 0;
         }
 
-        if (enableXY && newRgbdMeasurement) {
+        if (enableXY && newDeltaMeasurement) {
             if(enable_partial_update) {
                 xyEst.partialUpdate();
             }
                 else{
                     xyEst.update();
-                    newRgbdMeasurement = false;
+                newDeltaMeasurement = false;
                 }
             }
 
@@ -267,13 +270,29 @@ namespace reef_estimator
     //Mocap XY Pose update
     void XYZEstimator::deltaPoseUpdate(geometry_msgs::Pose pose_msg){
         // TODO: Humberto please do all the coordinate frame transforms. It needs to go before chi2 rejection
-        if (chi2AcceptDeltaPose(pose_msg)){
-            xyEst.z(0) = pose_msg.position.x;
-            xyEst.z(1) = pose_msg.position.y;
-            double yaw = reef_msgs::get_yaw(pose_msg.orientation);
-            xyEst.z(2) = yaw;
-            newRgbdMeasurement = true;
-        }
+        Eigen::Matrix3d delta_C;
+        delta_C = reef_msgs::quaternion_to_rotation(pose_msg.orientation).transpose();
+        Eigen::Matrix3d C_body_to_camera;
+        C_body_to_camera = body_to_camera.linear().transpose();
+        Eigen::Vector3d delta_position_camera_frame;
+        delta_position_camera_frame<< pose_msg.position.x, pose_msg.position.y, pose_msg.position.z;
+        Eigen::Vector3d delta_position_body_level;
+        delta_position_body_level << xyEst.C_body_level_to_body_frame.transpose()*C_body_to_camera.transpose()*delta_position_camera_frame;
+
+        Eigen::Matrix3d delta_C_level_to_next_level_frame;
+        delta_C_level_to_next_level_frame = xyEst.C_body_level_to_body_frame.transpose() *C_body_to_camera.transpose()* delta_C*C_body_to_camera*xyEst.C_body_level_to_body_frame;
+        double delta_yaw;
+        reef_msgs::get_yaw(delta_C_level_to_next_level_frame,delta_yaw);
+
+        xyEst.z << delta_position_body_level(0), delta_position_body_level(1),delta_yaw;
+
+
+//TODO: Include the rejection scheme for the delta measurements.
+//        if (chi2AcceptDeltaPose(pose_msg)){
+
+
+            newDeltaMeasurement = true;
+//        }
     }
 
     bool XYZEstimator::chi2Accept(float range_measurement) 

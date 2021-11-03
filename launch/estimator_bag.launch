@@ -1,0 +1,36 @@
+<launch>
+    <arg name="vehicle" default="kiwi"/>
+    <arg name="run_estimator" default="true"/>
+    <arg name="run_mocap_vel" default="true"/>
+    <arg name="play_bag" default="true"/>
+
+    <rosparam command="load" file="$(find reef_estimator)/params/$(arg vehicle)_camera.yaml" />
+
+    <group if="$(arg play_bag)">
+        <arg name="bag_path" default="/home/humberto/Downloads/reef_2.bag"/>
+        <node pkg="rosbag" type="play" name="player" output="screen" args="--clock --pause $(arg bag_path)">
+            <remap from="/et/ned/pose_stamped" to="/pose_stamped"/>
+        </node>
+    </group>
+
+<!--    <node if="$(arg run_estimator)" name="reef_estimator" pkg="reef_estimator" type="reef_estimator" output="screen">-->
+<!--        <rosparam file="$(find reef_estimator)/params/xy_est_params.yaml" />-->
+<!--        <rosparam file="$(find reef_estimator)/params/z_est_params.yaml" />-->
+<!--        <rosparam file="$(find reef_estimator)/params/basic_params.yaml" />-->
+<!--        <rosparam>-->
+<!--            enable_rgbd: false-->
+<!--            enable_sonar: false-->
+<!--            enable_mocap_xy: true-->
+<!--            enable_mocap_z: true-->
+<!--        </rosparam>-->
+<!--        <remap from="mocap_ned" to="pose_stamped"/>-->
+<!--        <remap from="mocap_velocity/body_level_frame" to="velocity/body_level_frame"/>-->
+<!--        <remap from="rgbd_velocity_body_frame" to="rgbd_to_velocity/body_level_frame"/>-->
+<!--    </node>-->
+
+    <node name="delta_odom" pkg="delta_odom" type="node" output="screen" >
+        <rosparam command="load" file="$(find delta_odom)/params/basic.yaml" />
+        <!--		<remap from="odom" to="multirotor/truth/NED"/> -->
+    </node>
+
+</launch>
