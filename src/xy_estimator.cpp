@@ -197,9 +197,10 @@ namespace reef_estimator
 
         distance = sqrt(pow(xHat(6), 2) + pow(xHat(7), 2));
 
-        if (XYTakeoff && distance > dPoseLimit || (XYTakeoff && (xHat(8)) > dYawLimit)) {
+        if ((XYTakeoff && distance > dPoseLimit) || (XYTakeoff && (xHat(8)) > dYawLimit)) {
             XYEstimator::relativeReset(xHat, P);
         }
+
     }
 
     void XYEstimator::resetLandingState()
@@ -239,6 +240,7 @@ namespace reef_estimator
 
         global_pose = global_pose*current_delta;
 
+
         // Publish current position and heading to topic to be read from backend compiler here (reset to zero after)
         Delta.x = xHat(PX);
         Delta.y = xHat(PY);
@@ -249,21 +251,17 @@ namespace reef_estimator
 
         xHat(PX) = 0.;
         xHat(PY) = 0.;
-        xHat(YAW) = 0;
+        xHat(YAW) = 0.;
 
-        
-        Eigen::MatrixXd P6 = Eigen::MatrixXd(1,12);
-        Eigen::MatrixXd P7 = Eigen::MatrixXd(1,12);
-        Eigen::MatrixXd P8 = Eigen::MatrixXd(1,12);
-        P6 << 0, 0, 0, 0, 0, 0, P0(6,6), 0, 0, 0, 0, 0;
-        P7 << 0, 0, 0, 0, 0, 0, 0, P0(7,7), 0, 0, 0, 0;
-        P8 << 0, 0, 0, 0, 0, 0, 0, 0, P0(8,8), 0, 0, 0;
+        //Reset crosscovariances to zero
+        P.block<6,6>(PX,VX) = Eigen::MatrixXd::Zero(6,6) ;
+        P.block<6,6>(VX,PX) = Eigen::MatrixXd::Zero(6,6);
+        P.block<3,3>(PX,BAX) = Eigen::MatrixXd::Zero(3,3);
+        P.block<3,3>(BAX,PX) = Eigen::MatrixXd::Zero(3,3);
+        //Reset xy and psi covariances to initial values
+        P.block<6,6>(PX,PX) = P0.block<6,6>(PX,PX);
 
-        P.block<1,12>(6,0) = P6;
-        P.block<1,12>(7,0) = P7;
-        P.block<1,12>(8,0) = P8;
-
-       resetCount++;
+        resetCount++;
     }
 
     /* Implementation of propagate and update is not here, but

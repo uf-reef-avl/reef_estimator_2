@@ -86,7 +86,7 @@ namespace reef_estimator
         
         bool want_delta;
         enum StateIndicies
-        {   U,   V,
+        {   VX,   VY,
             BR, BP,
             BAX, BAY,
             PX,  PY, YAW,
