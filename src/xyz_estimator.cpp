@@ -76,9 +76,9 @@ namespace reef_estimator
         xyEst.Q *= (xyEst.dt*xyEst.dt);
 
         //Get the constraint to implement relative reset from yaml file
-        private_nh_.param<double>("delta_pose_limit", xyEst.dPoseLimit, 0.01);
-        private_nh_.param<double>("delta_yaw_limit", xyEst.dYawLimit, 0.08);
-        private_nh_.param<double>("delta_time_limit", xyEst.dTimeLimit, 2.0);
+        private_nh_.param<double>("delta_pose_limit", xyEst.dPoseLimit, 0.5);
+        private_nh_.param<double>("delta_yaw_limit", xyEst.dYawLimit, 0.7);
+        private_nh_.param<double>("delta_time_limit", xyEst.dTimeLimit, 100.0);
 
         xyEst.initialize();//Initialize P,R and beta.
 
@@ -229,10 +229,10 @@ namespace reef_estimator
 
         if (enableXY && newDeltaMeasurement) {
             if(enable_partial_update) {
-                xyEst.partialUpdate();
+//                xyEst.partialUpdate();
             }
                 else{
-                    xyEst.update();
+//                    xyEst.update();
                 newDeltaMeasurement = false;
                 }
             }
@@ -447,6 +447,9 @@ namespace reef_estimator
         xyzDebugState.xy_minus.roll_bias = xyEst.xHat(3);
         xyzDebugState.xy_minus.xa_bias = xyEst.xHat(4);
         xyzDebugState.xy_minus.ya_bias = xyEst.xHat(5);
+        xyzDebugState.xy_minus.delta_x = xyEst.xHat(xyEst.PX);
+        xyzDebugState.xy_minus.delta_y = xyEst.xHat(xyEst.PY);
+        xyzDebugState.xy_minus.delta_yaw = xyEst.xHat(xyEst.YAW);
 
         xySigma = Eigen::MatrixXd(6, 1);
         xySigma(0) = 3 * sqrt(xyEst.P(0, 0));
@@ -493,15 +496,9 @@ namespace reef_estimator
         xyzState.xy_plus.x_dot = xyEst.xHat(0);
         xyzState.xy_plus.y_dot = xyEst.xHat(1);
 
-        //Publish if using delta mod
-//        xyzState.xy_plus.x = xyEst.global_x;
-//        xyzState.xy_plus.y = xyEst.global_y;
-//        xyzState.yaw = xyEst.global_yaw;
-
-        // Publish if not using delta mod
-//        xyzState.xy_plus.x = xyEst.xHat(6);
-//        xyzState.xy_plus.y = xyEst.xHat(7);
-//        xyzState.yaw = xyEst.xHat(8);
+        xyzState.xy_plus.delta_x = xyEst.xHat(xyEst.PX);
+        xyzState.xy_plus.delta_y = xyEst.xHat(xyEst.PY);
+        xyzState.xy_plus.delta_yaw = xyEst.xHat(xyEst.YAW);
 
         xyzState.z_plus.z = zEst.xHat(0);
         xyzState.z_plus.z_dot = zEst.xHat(1);
@@ -513,7 +510,7 @@ namespace reef_estimator
         xyzPose.pose.position.y = xyEst.global_y;
         xyzPose.pose.position.z = zEst.xHat(0);
 //        xyPose.pose.position.z = xyEst.global_yaw;
-//        xyPose.header.stamp = ros::Time::now().toSec();
+        xyzPose.header = xyzState.header;
 
         reef_msgs::quaternion_from_roll_pitch_yaw(xyEst.roll_est, xyEst.pitch_est, xyEst.global_yaw, xyzPose.pose.orientation);
 
@@ -529,6 +526,9 @@ namespace reef_estimator
             xyzDebugState.xy_plus.roll_bias = xyEst.xHat(3);
             xyzDebugState.xy_plus.xa_bias = xyEst.xHat(4);
             xyzDebugState.xy_plus.ya_bias = xyEst.xHat(5);
+            xyzDebugState.xy_plus.delta_x = xyEst.xHat(xyEst.PX);
+            xyzDebugState.xy_plus.delta_y = xyEst.xHat(xyEst.PY);
+            xyzDebugState.xy_plus.delta_yaw = xyEst.xHat(xyEst.YAW);
             xySigma = Eigen::MatrixXd(6, 1);
             xySigma(0) = 3 * sqrt(xyEst.P(0, 0));
             xySigma(1) = 3 * sqrt(xyEst.P(1, 1));

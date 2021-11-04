@@ -197,19 +197,9 @@ namespace reef_estimator
 
         distance = sqrt(pow(xHat(6), 2) + pow(xHat(7), 2));
 
-        if (XYTakeoff && distance > dPoseLimit || XYTakeoff && (xHat(8)) > dYawLimit) {
+        if (XYTakeoff && distance > dPoseLimit || (XYTakeoff && (xHat(8)) > dYawLimit)) {
             XYEstimator::relativeReset(xHat, P);
         }
-        // @humberto/Grant what is happening here?
-
-            global_x = global_x + xHat(6) - lastX;
-            global_y = global_y + xHat(7) - lastY;
-            global_yaw = global_yaw + xHat(8) - lastYaw;
-
-            lastX = xHat(6);
-            lastY = xHat(7);
-            lastYaw = xHat(8);
-
     }
 
     void XYEstimator::resetLandingState()
@@ -248,7 +238,6 @@ namespace reef_estimator
         current_delta.linear() = reef_msgs::DCM_from_Euler321(Eigen::Vector3d(0,0,xHat(YAW))).transpose();
 
         global_pose = global_pose*current_delta;
-
 
         // Publish current position and heading to topic to be read from backend compiler here (reset to zero after)
         Delta.x = xHat(PX);
