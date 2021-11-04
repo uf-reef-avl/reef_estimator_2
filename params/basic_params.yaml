@@ -1,4 +1,4 @@
-reef_estimator: {
+{
 
   debug_mode: true,
   enable_partial_update: true,

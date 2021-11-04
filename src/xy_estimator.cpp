@@ -56,6 +56,7 @@ namespace reef_estimator
         psi = 0.;
 
         relativeReset_publisher_ = nh_.advertise<geometry_msgs::Vector3>("deltaState", 1, true);
+        keyframe_now = nh_.advertise<std_msgs::Empty>("keyframe_now",1);
         global_pose.setIdentity();
     }
 
@@ -66,8 +67,8 @@ namespace reef_estimator
 
         reef_msgs::roll_pitch_yaw_from_rotation321(C_NED_to_body_frame, roll, pitch, yaw);
 
-        roll_bias = xHat(3);
-        pitch_bias = xHat(2);
+        roll_bias = xHat(BR);
+        pitch_bias = xHat(BP);
 
 
         pitch_est = pitch - pitch_bias;
@@ -111,7 +112,7 @@ namespace reef_estimator
         xy_time_update = nonLinearDynamics * dt;
 
         Eigen::Vector3d gyro_in_body_level_frame;
-        gyro_in_body_level_frame = C_NED_to_body_frame.transpose() * gyroxyz_in_body_frame;
+        gyro_in_body_level_frame = C_NED_to_body_frame.transpose() *( gyroxyz_in_body_frame - xHat.block<3,1>(BGX,0));
 
         xHat << xHat(0) + xy_time_update(0),
                 xHat(1) + xy_time_update(1),
@@ -196,8 +197,7 @@ namespace reef_estimator
 //        P = F*P*F.transpose() + G*Q*G.transpose();
 
         distance = sqrt(pow(xHat(6), 2) + pow(xHat(7), 2));
-
-        if ((XYTakeoff && distance > dPoseLimit) || (XYTakeoff && (xHat(8)) > dYawLimit)) {
+        if ((XYTakeoff && (distance > dPoseLimit)) || (XYTakeoff && (xHat(8) > dYawLimit))) {
             XYEstimator::relativeReset(xHat, P);
         }
 
@@ -222,16 +222,12 @@ namespace reef_estimator
         global_x = xHat(6);
         global_y = xHat(7);
         global_yaw = xHat(8);
-
-//        XYTakeoff = false;
     }
 
 
     void XYEstimator::relativeReset(Eigen::MatrixXd &xHat, Eigen::MatrixXd &P){
 
-        //TODO: Grant/Humberto: Fix this
         std_msgs::Empty empty;
-        ros::Publisher keyframe_now = nh_.advertise<std_msgs::Empty>("keyframe_now",1);
         keyframe_now.publish(empty);
 
         Eigen::Affine3d current_delta;
@@ -246,7 +242,7 @@ namespace reef_estimator
         Delta.y = xHat(PY);
         Delta.z = xHat(YAW);
 
-//        relativeReset_publisher_.publish(Delta);
+        relativeReset_publisher_.publish(Delta);
 
 
         xHat(PX) = 0.;

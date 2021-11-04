@@ -22,6 +22,7 @@ namespace reef_estimator
          */
         ros::NodeHandle nh_;
         ros::Publisher relativeReset_publisher_;
+        ros::Publisher keyframe_now;
 
         Eigen::Matrix3d C_body_to_body_fixed_frame;
         void nonlinearPropagation(Eigen::Matrix3d &C,double initialAcc, Eigen::Vector3d accel_in_body, Eigen::Vector3d gyro_in_body, float bias_z_in_NED_component);

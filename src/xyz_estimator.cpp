@@ -94,6 +94,7 @@ namespace reef_estimator
         zEst.updateLinearModel();
         zEst.initialize();
         zEst.setTakeoffState(false);
+        xyEst.XYTakeoff = false;
 
         reef_msgs::loadTransform("body_to_camera",body_to_camera);
         ROS_WARN_STREAM("[REEF EST]:: Body to camera \n" << body_to_camera.matrix());
@@ -193,8 +194,6 @@ namespace reef_estimator
         zEst.u(0) = accelxyz_in_NED_frame(2) + initialAccMagnitude; //We need to take avg from csv file to get a better g.
         //        zEst.u(0) = accelxyz_in_NED_frame(2) + initialAccMagnitude + zEst.xHat(2); //We need to take avg from csv file to get a better g.
 
-
-
         //Finally propagate.
         xyEst.nonlinearPropagation(C_NED_to_body_frame, initialAccMagnitude, accelxyz_in_body_frame, gyroxyz_in_body_frame, zEst.xHat(2));
         zEst.updateLinearModel();
@@ -219,8 +218,7 @@ namespace reef_estimator
         {
             if (enableXY)
                 xyEst.resetLandingState();
-                xyEst.XYTakeoff = false;
-            
+
             if (enableZ)
                 zEst.resetLandingState();
 
@@ -230,13 +228,13 @@ namespace reef_estimator
 
         if (enableXY && newDeltaMeasurement) {
             if(enable_partial_update) {
-//                xyEst.partialUpdate();
+                xyEst.partialUpdate();
             }
-                else{
-//                    xyEst.update();
-                newDeltaMeasurement = false;
-                }
+            else{
+                xyEst.update();
             }
+            newDeltaMeasurement = false;
+        }
 
         if (enableZ && newSonarMeasurement) {
             //TODO adjust estimator to perform partialUpdate on z as well.
@@ -255,17 +253,16 @@ namespace reef_estimator
     //Sonar update
     void XYZEstimator::sensorUpdate(sensor_msgs::Range range_msg) 
     {
-        if (!useMocapZ) 
+
+        if (range_msg.range <= range_msg.max_range)
         {
-            if (range_msg.range <= range_msg.max_range) 
+            if (chi2Accept(range_msg.range))
             {
-                if (chi2Accept(range_msg.range)) 
-                {
-                    zEst.z(0) = -range_msg.range; // negative size to convert to NED
-                    newSonarMeasurement = true;
-                }
+                zEst.z(0) = -range_msg.range; // negative size to convert to NED
+                newSonarMeasurement = true;
             }
         }
+
     }
 
     //Mocap XY Pose update
@@ -421,8 +418,7 @@ namespace reef_estimator
         if (accTakeoffState && sonarTakeoffState && !takeoffState.data) 
         {
             ROS_INFO("Takeoff!");
-
-            zEst.setTakeoffState(true);\
+            zEst.setTakeoffState(true);
             xyEst.XYTakeoff = true;
             takeoffState.data = true;
             is_flying_publisher_.publish(takeoffState);
@@ -430,7 +426,6 @@ namespace reef_estimator
         else if (!accTakeoffState && !sonarTakeoffState && takeoffState.data) 
         {
             ROS_INFO("Landing!");
-
             zEst.setTakeoffState(false);
             takeoffState.data = false;
             is_flying_publisher_.publish(takeoffState);
