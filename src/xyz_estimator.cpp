@@ -81,6 +81,7 @@ namespace reef_estimator
         private_nh_.param<double>("delta_time_limit", xyEst.dTimeLimit, 2.0);
 
         xyEst.initialize();//Initialize P,R and beta.
+        //Save the initial covariances for relative states XY and yaw
 
         reef_msgs::importMatrixFromParamServer(private_nh_, zEst.xHat0, "z_x0");
         reef_msgs::importMatrixFromParamServer(private_nh_, zEst.P0, "z_P0");
