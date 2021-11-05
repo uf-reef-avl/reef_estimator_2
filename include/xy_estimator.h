@@ -30,6 +30,11 @@ namespace reef_estimator
         void relativeReset(Eigen::MatrixXd &xHat, Eigen::MatrixXd &P);
 
         Eigen::Matrix3d C_body_level_to_body_frame ;
+        Eigen::Matrix3d C_keyframe_to_level_keyframe_at_keyframe_time;
+        Eigen::Affine3d body_to_camera;
+        Eigen::Matrix3d C_body_to_camera;
+
+
         Eigen::Vector3d nonLinearDynamics;
         Eigen::Matrix2d Id;
         Eigen::Affine3d global_pose;

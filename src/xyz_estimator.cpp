@@ -81,6 +81,27 @@ namespace reef_estimator
         private_nh_.param<double>("delta_time_limit", xyEst.dTimeLimit, 100.0);
 
         xyEst.initialize();//Initialize P,R and beta.
+
+        //Initialization of the first frame with MOCAP
+        double roll_init, pitch_init, yaw_init;
+        std::string mocapPoseTopic;
+        nh_.param<std::string>("mocap_pose_topic", mocapPoseTopic, "mocap_ned");
+        geometry_msgs::PoseStampedConstPtr pose_msg;
+        pose_msg = ros::topic::waitForMessage<geometry_msgs::PoseStamped>("/pose_stamped", nh_);
+        if (pose_msg != NULL) {
+            ROS_INFO_STREAM("GOT MY FIRST MOCAP MESSAGE");
+            reef_msgs::roll_pitch_yaw_from_quaternion(pose_msg->pose.orientation,roll_init, pitch_init, yaw_init);
+            xyEst.xHat0(xyEst.PX) = pose_msg->pose.position.x;
+            xyEst.xHat0(xyEst.PY) = pose_msg->pose.position.y;
+            xyEst.xHat0(xyEst.YAW) = yaw_init;
+            ROS_WARN_STREAM(xyEst.xHat0);
+
+        }
+        xyEst.global_pose.linear() = reef_msgs::DCM_from_Euler321(Eigen::Vector3d (0,0,yaw_init)).transpose();
+        xyEst.global_pose.translation() = Eigen::Vector3d (xyEst.xHat0(xyEst.PX),xyEst.xHat0(xyEst.PY),0);
+
+
+
         //Save the initial covariances for relative states XY and yaw
 
         reef_msgs::importMatrixFromParamServer(private_nh_, zEst.xHat0, "z_x0");
@@ -96,9 +117,11 @@ namespace reef_estimator
         zEst.setTakeoffState(false);
         xyEst.XYTakeoff = false;
 
-        reef_msgs::loadTransform("body_to_camera",body_to_camera);
-        ROS_WARN_STREAM("[REEF EST]:: Body to camera \n" << body_to_camera.matrix());
-        
+     //Initialize the keyframe
+        xyEst.C_keyframe_to_level_keyframe_at_keyframe_time = reef_msgs::DCM_from_Euler321(Eigen::Vector3d (0, 0, xyEst.xHat(xyEst.YAW))) * xyEst.C_body_level_to_body_frame.transpose() * xyEst.C_body_to_camera.transpose();
+
+
+
         state_publisher_ = nh_.advertise<reef_msgs::XYZEstimate>("xyz_estimate", 1, true);
         pose_publisher_ =  nh_.advertise<geometry_msgs::PoseStamped>("xyz_pose", 1, true);
         
@@ -228,10 +251,10 @@ namespace reef_estimator
 
         if (enableXY && newDeltaMeasurement) {
             if(enable_partial_update) {
-                xyEst.partialUpdate();
+//                xyEst.partialUpdate();
             }
             else{
-                xyEst.update();
+//                xyEst.update();
             }
             newDeltaMeasurement = false;
         }
@@ -268,27 +291,24 @@ namespace reef_estimator
     //Mocap XY Pose update
     void XYZEstimator::deltaPoseUpdate(geometry_msgs::Pose pose_msg){
         // TODO: Humberto please do all the coordinate frame transforms. It needs to go before chi2 rejection
+
         Eigen::Matrix3d delta_C;
-        delta_C = reef_msgs::quaternion_to_rotation(pose_msg.orientation).transpose();
-        Eigen::Matrix3d C_body_to_camera;
-        C_body_to_camera = body_to_camera.linear().transpose();
+        delta_C = reef_msgs::quaternion_to_rotation(pose_msg.orientation);
+
         Eigen::Vector3d delta_position_camera_frame;
-        delta_position_camera_frame<< pose_msg.position.x, pose_msg.position.y, pose_msg.position.z;
+        delta_position_camera_frame<< pose_msg.position.x, pose_msg.position.y, 0.0;
         Eigen::Vector3d delta_position_body_level;
-        delta_position_body_level << xyEst.C_body_level_to_body_frame.transpose()*C_body_to_camera.transpose()*delta_position_camera_frame;
+        delta_position_body_level << xyEst.C_keyframe_to_level_keyframe_at_keyframe_time * delta_position_camera_frame;
 
         Eigen::Matrix3d delta_C_level_to_next_level_frame;
-        delta_C_level_to_next_level_frame = xyEst.C_body_level_to_body_frame.transpose() *C_body_to_camera.transpose()* delta_C*C_body_to_camera*xyEst.C_body_level_to_body_frame;
+        delta_C_level_to_next_level_frame = xyEst.C_keyframe_to_level_keyframe_at_keyframe_time.transpose() * delta_C;
         double delta_yaw;
         reef_msgs::get_yaw(delta_C_level_to_next_level_frame,delta_yaw);
 
-        xyEst.z << delta_position_body_level(0), delta_position_body_level(1),delta_yaw;
-
+        xyEst.z << delta_position_body_level(0), delta_position_body_level(1), delta_yaw;
 
 //TODO: Include the rejection scheme for the delta measurements.
 //        if (chi2AcceptDeltaPose(pose_msg)){
-
-
             newDeltaMeasurement = true;
 //        }
     }
@@ -376,7 +396,7 @@ namespace reef_estimator
 
     void XYZEstimator::checkTakeoffState(double accMagnitude) 
     {
-        sonarTakeoffState = zEst.z(0) <= -0.25;
+        sonarTakeoffState = zEst.z(0) <= -0.18;
 
         //Check variance of accelerometer vector magnitude
         if ((!accTakeoffState) || (!sonarTakeoffState && accTakeoffState))
@@ -437,6 +457,7 @@ namespace reef_estimator
         // TODO: Humberto/Grant: Publish the integrated position as a geometry_msg/PoseStamped
         // TODO: Humberto/Grant: Publish the xyz_estimate with position and velocity here
         //XY estimator publisher block------------------------------------------
+
         xyzDebugState.xy_minus.x_dot = xyEst.xHat(0);
         xyzDebugState.xy_minus.y_dot = xyEst.xHat(1);
         xyzDebugState.xy_minus.pitch_bias = xyEst.xHat(2);
@@ -447,13 +468,19 @@ namespace reef_estimator
         xyzDebugState.xy_minus.delta_y = xyEst.xHat(xyEst.PY);
         xyzDebugState.xy_minus.delta_yaw = xyEst.xHat(xyEst.YAW);
 
-        xySigma = Eigen::MatrixXd(6, 1);
+        xySigma = Eigen::MatrixXd(12, 1);
         xySigma(0) = 3 * sqrt(xyEst.P(0, 0));
         xySigma(1) = 3 * sqrt(xyEst.P(1, 1));
         xySigma(2) = 3 * sqrt(xyEst.P(2, 2));
         xySigma(3) = 3 * sqrt(xyEst.P(3, 3));
         xySigma(4) = 3 * sqrt(xyEst.P(4, 4));
         xySigma(5) = 3 * sqrt(xyEst.P(5, 5));
+        xySigma(6) = 3 * sqrt(xyEst.P(6, 6));
+        xySigma(7) = 3 * sqrt(xyEst.P(7, 7));
+        xySigma(8) = 3 * sqrt(xyEst.P(8, 8));
+        xySigma(9) = 3 * sqrt(xyEst.P(9, 9));
+        xySigma(10) = 3 * sqrt(xyEst.P(10, 10));
+        xySigma(11) = 3 * sqrt(xyEst.P(11, 11));
         xyzDebugState.xy_minus.sigma_plus[0] = xyzDebugState.xy_minus.x_dot + xySigma(0);
         xyzDebugState.xy_minus.sigma_minus[0] = xyzDebugState.xy_minus.x_dot - xySigma(0);
         xyzDebugState.xy_minus.sigma_plus[1] = xyzDebugState.xy_minus.y_dot + xySigma(1);
@@ -466,6 +493,19 @@ namespace reef_estimator
         xyzDebugState.xy_minus.sigma_minus[4] = xyzDebugState.xy_minus.xa_bias - xySigma(4);
         xyzDebugState.xy_minus.sigma_plus[5] = xyzDebugState.xy_minus.ya_bias + xySigma(5);
         xyzDebugState.xy_minus.sigma_minus[5] = xyzDebugState.xy_minus.ya_bias - xySigma(5);
+
+        xyzDebugState.xy_minus.sigma_plus[6] = xyzDebugState.xy_minus.ya_bias + xySigma(6);
+        xyzDebugState.xy_minus.sigma_minus[6] = xyzDebugState.xy_minus.ya_bias - xySigma(6);
+        xyzDebugState.xy_minus.sigma_plus[7] = xyzDebugState.xy_minus.ya_bias + xySigma(7);
+        xyzDebugState.xy_minus.sigma_minus[7] = xyzDebugState.xy_minus.ya_bias - xySigma(7);
+        xyzDebugState.xy_minus.sigma_plus[8] = xyzDebugState.xy_minus.ya_bias + xySigma(8);
+        xyzDebugState.xy_minus.sigma_minus[8] = xyzDebugState.xy_minus.ya_bias - xySigma(8);
+        xyzDebugState.xy_minus.sigma_plus[9] = xyzDebugState.xy_minus.ya_bias + xySigma(9);
+        xyzDebugState.xy_minus.sigma_minus[9] = xyzDebugState.xy_minus.ya_bias - xySigma(9);
+        xyzDebugState.xy_minus.sigma_plus[10] = xyzDebugState.xy_minus.ya_bias + xySigma(10);
+        xyzDebugState.xy_minus.sigma_minus[10] = xyzDebugState.xy_minus.ya_bias - xySigma(10);
+        xyzDebugState.xy_minus.sigma_plus[11] = xyzDebugState.xy_minus.ya_bias + xySigma(11);
+        xyzDebugState.xy_minus.sigma_minus[11] = xyzDebugState.xy_minus.ya_bias - xySigma(11);
 
         //Z estimator publisher block------------------------------------------
         xyzDebugState.z_minus.z = zEst.xHat(0, 0);
@@ -491,7 +531,6 @@ namespace reef_estimator
         //Publish XY and Z states
         xyzState.xy_plus.x_dot = xyEst.xHat(0);
         xyzState.xy_plus.y_dot = xyEst.xHat(1);
-
         xyzState.xy_plus.delta_x = xyEst.xHat(xyEst.PX);
         xyzState.xy_plus.delta_y = xyEst.xHat(xyEst.PY);
         xyzState.xy_plus.delta_yaw = xyEst.xHat(xyEst.YAW);
@@ -504,8 +543,7 @@ namespace reef_estimator
 
         xyzPose.pose.position.x = xyEst.global_x;
         xyzPose.pose.position.y = xyEst.global_y;
-        xyzPose.pose.position.z = zEst.xHat(0);
-//        xyPose.pose.position.z = xyEst.global_yaw;
+        xyzPose.pose.position.z = xyEst.global_yaw;
         xyzPose.header = xyzState.header;
 
         reef_msgs::quaternion_from_roll_pitch_yaw(xyEst.roll_est, xyEst.pitch_est, xyEst.global_yaw, xyzPose.pose.orientation);
@@ -525,13 +563,19 @@ namespace reef_estimator
             xyzDebugState.xy_plus.delta_x = xyEst.xHat(xyEst.PX);
             xyzDebugState.xy_plus.delta_y = xyEst.xHat(xyEst.PY);
             xyzDebugState.xy_plus.delta_yaw = xyEst.xHat(xyEst.YAW);
-            xySigma = Eigen::MatrixXd(6, 1);
+            xySigma = Eigen::MatrixXd(12, 1);
             xySigma(0) = 3 * sqrt(xyEst.P(0, 0));
             xySigma(1) = 3 * sqrt(xyEst.P(1, 1));
             xySigma(2) = 3 * sqrt(xyEst.P(2, 2));
             xySigma(3) = 3 * sqrt(xyEst.P(3, 3));
             xySigma(4) = 3 * sqrt(xyEst.P(4, 4));
             xySigma(5) = 3 * sqrt(xyEst.P(5, 5));
+            xySigma(6) = 3 * sqrt(xyEst.P(6, 6));
+            xySigma(7) = 3 * sqrt(xyEst.P(7, 7));
+            xySigma(8) = 3 * sqrt(xyEst.P(8, 8));
+            xySigma(9) = 3 * sqrt(xyEst.P(9, 9));
+            xySigma(10) = 3 * sqrt(xyEst.P(10, 10));
+            xySigma(11) = 3 * sqrt(xyEst.P(11, 11));
             xyzDebugState.xy_plus.sigma_plus[0] = xyzDebugState.xy_plus.x_dot + xySigma(0);
             xyzDebugState.xy_plus.sigma_minus[0] = xyzDebugState.xy_plus.x_dot - xySigma(0);
             xyzDebugState.xy_plus.sigma_plus[1] = xyzDebugState.xy_plus.y_dot + xySigma(1);
@@ -544,6 +588,19 @@ namespace reef_estimator
             xyzDebugState.xy_plus.sigma_minus[4] = xyzDebugState.xy_plus.xa_bias - xySigma(4);
             xyzDebugState.xy_plus.sigma_plus[5] = xyzDebugState.xy_plus.ya_bias + xySigma(5);
             xyzDebugState.xy_plus.sigma_minus[5] = xyzDebugState.xy_plus.ya_bias - xySigma(5);
+
+            xyzDebugState.xy_plus.sigma_plus[6] = xyzDebugState.xy_plus.ya_bias + xySigma(6);
+            xyzDebugState.xy_plus.sigma_minus[6] = xyzDebugState.xy_plus.ya_bias - xySigma(6);
+            xyzDebugState.xy_plus.sigma_plus[7] = xyzDebugState.xy_plus.ya_bias + xySigma(7);
+            xyzDebugState.xy_plus.sigma_minus[7] = xyzDebugState.xy_plus.ya_bias - xySigma(7);
+            xyzDebugState.xy_plus.sigma_plus[8] = xyzDebugState.xy_plus.ya_bias + xySigma(8);
+            xyzDebugState.xy_plus.sigma_minus[8] = xyzDebugState.xy_plus.ya_bias - xySigma(8);
+            xyzDebugState.xy_plus.sigma_plus[9] = xyzDebugState.xy_plus.ya_bias + xySigma(9);
+            xyzDebugState.xy_plus.sigma_minus[9] = xyzDebugState.xy_plus.ya_bias - xySigma(9);
+            xyzDebugState.xy_plus.sigma_plus[10] = xyzDebugState.xy_plus.ya_bias + xySigma(10);
+            xyzDebugState.xy_plus.sigma_minus[10] = xyzDebugState.xy_plus.ya_bias - xySigma(10);
+            xyzDebugState.xy_plus.sigma_plus[11] = xyzDebugState.xy_plus.ya_bias + xySigma(11);
+            xyzDebugState.xy_plus.sigma_minus[11] = xyzDebugState.xy_plus.ya_bias - xySigma(11);
 
             //Z filter debug variables
             xyzDebugState.z_plus.z = zEst.xHat(0);

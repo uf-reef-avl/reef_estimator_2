@@ -93,7 +93,8 @@ namespace reef_estimator
         Eigen::Vector3d Mahalanobis_D_hat;
         Eigen::Vector2d measurement;
         Eigen::Vector2d expected_rgbd;
-        Eigen::Affine3d body_to_camera;
+
+
 
         double beta_0;
         Eigen::MatrixXd xySigma;

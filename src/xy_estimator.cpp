@@ -5,6 +5,7 @@
 #include "xy_estimator.h"
 #include <eigen3/Eigen/Core>
 #include <iostream>
+#include <reef_msgs/matrix_operation.h>
 
 namespace reef_estimator
 {
@@ -54,17 +55,25 @@ namespace reef_estimator
         phi = 0.;
         theta = 0.;
         psi = 0.;
-
+        reef_msgs::loadTransform("body_to_camera",body_to_camera);
+        ROS_WARN_STREAM("[REEF EST]:: Body to camera \n" << body_to_camera.matrix());
+        //Initialize the keyframe
+        C_body_to_camera = body_to_camera.linear().transpose();
         relativeReset_publisher_ = nh_.advertise<geometry_msgs::Vector3>("deltaState", 1, true);
         keyframe_now = nh_.advertise<std_msgs::Empty>("keyframe_now",1);
-        global_pose.setIdentity();
+
+
     }
 
     XYEstimator::~XYEstimator(){}
 
     void XYEstimator::nonlinearPropagation(Eigen::Matrix3d &C_NED_to_body_frame, double initialAccMagnitude,Eigen::Vector3d accelxyz_in_body_frame, Eigen::Vector3d gyroxyz_in_body_frame, float bias_z_in_NED_component) {
-
-
+        //////Save state before propagating.//////
+        Eigen::Vector3d prior_state;
+        prior_state.x() = xHat(PX,0);
+        prior_state.y() = xHat(PY,0);
+        prior_state.z() = xHat(YAW);
+        //////////////////////////////////////////
         reef_msgs::roll_pitch_yaw_from_rotation321(C_NED_to_body_frame, roll, pitch, yaw);
 
         roll_bias = xHat(BR);
@@ -196,8 +205,33 @@ namespace reef_estimator
         P = P + (F * P.transpose() + P * F.transpose() + G * Q * G.transpose()) * dt;
 //        P = F*P*F.transpose() + G*Q*G.transpose();
 
+        //Accumulate the small delta poses
+
+        Eigen::Vector3d propagated_state;
+        propagated_state.x() = xHat(PX,0);
+        propagated_state.y() = xHat(PY,0);
+        propagated_state.z() = xHat(YAW);
+
+        //Now we compute the gain in pose.
+        Eigen::Vector3d difference_in_pose;
+        difference_in_pose = propagated_state - prior_state;
+        Eigen::Affine3d pose_gain;
+        pose_gain.linear() = reef_msgs::DCM_from_Euler321(Eigen::Vector3d (0,0,difference_in_pose.z())).transpose();
+        pose_gain.translation() << difference_in_pose.x(),difference_in_pose.y(), 0.0; //We do not do altitude deltas. That is in the Z filter.
+
+        global_pose = global_pose*pose_gain;
+        global_x = global_pose.translation().x();
+        global_y = global_pose.translation().y();
+        reef_msgs::get_yaw(global_pose.linear().transpose(), global_yaw);
+        if(global_yaw<0.0){
+            global_yaw += 2*M_PI;
+        }
+
+
         distance = sqrt(pow(xHat(6), 2) + pow(xHat(7), 2));
         if ((XYTakeoff && (distance > dPoseLimit)) || (XYTakeoff && (xHat(8) > dYawLimit))) {
+            //Save attitudes at the time of keyframe
+            C_keyframe_to_level_keyframe_at_keyframe_time = reef_msgs::DCM_from_Euler321(Eigen::Vector3d (0, 0, xHat(YAW))) * C_body_level_to_body_frame.transpose() * C_body_to_camera.transpose();
             XYEstimator::relativeReset(xHat, P);
         }
 
@@ -207,21 +241,18 @@ namespace reef_estimator
     {
         //Reset covariance P
         P = P0;
-        reef_msgs::roll_pitch_yaw_from_quaternion(orient0,phi, theta, psi);
-        roll = phi;
-        pitch = theta;
+//        reef_msgs::roll_pitch_yaw_from_quaternion(orient0,phi, theta, psi);
+//        roll = phi;
+//        pitch = theta;
 
         //Reset velocity estimate
         xHat = xHat0;
-        xHat(8) = psi;
-        lastYaw = psi;
-        lastX = xHat(6);
-        lastY = xHat(7);
+
 
         // Initial delta test
-        global_x = xHat(6);
-        global_y = xHat(7);
-        global_yaw = xHat(8);
+        global_x = xHat0(6);
+        global_y = xHat0(7);
+        global_yaw = xHat0(8);
     }
 
 
@@ -233,9 +264,8 @@ namespace reef_estimator
         Eigen::Affine3d current_delta;
         current_delta.translation() = Eigen::Vector3d(xHat(PX), xHat(PY),0);
         current_delta.linear() = reef_msgs::DCM_from_Euler321(Eigen::Vector3d(0,0,xHat(YAW))).transpose();
-
-        global_pose = global_pose*current_delta;
-
+//This line integrates the total delta from the one keyframe to the next.
+        //global_pose = global_pose*current_delta;
 
         // Publish current position and heading to topic to be read from backend compiler here (reset to zero after)
         Delta.x = xHat(PX);
@@ -243,7 +273,6 @@ namespace reef_estimator
         Delta.z = xHat(YAW);
 
         relativeReset_publisher_.publish(Delta);
-
 
         xHat(PX) = 0.;
         xHat(PY) = 0.;
