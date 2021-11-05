@@ -534,13 +534,13 @@ namespace reef_estimator
         //XY estimator publisher block------------------------------------------
         xyzDebugState.xy_minus.x_dot = xyEst.xHat(0);
         xyzDebugState.xy_minus.y_dot = xyEst.xHat(1);
-        xyzDebugState.xy_minus.pitch_bias = xyEst.xHat(2);
-        xyzDebugState.xy_minus.roll_bias = xyEst.xHat(3);
+        xyzDebugState.xy_minus.roll_bias = xyEst.xHat(2);
+        xyzDebugState.xy_minus.pitch_bias = xyEst.xHat(3);
         xyzDebugState.xy_minus.xa_bias = xyEst.xHat(4);
         xyzDebugState.xy_minus.ya_bias = xyEst.xHat(5);
-        xyzDebugState.xy_minus.x = xyEst.xHat(6);
-        xyzDebugState.xy_minus.y = xyEst.xHat(7);
-        xyzDebugState.xy_minus.yaw = xyEst.xHat(8);
+        xyzDebugState.xy_minus.delta_x = xyEst.xHat(6);
+        xyzDebugState.xy_minus.delta_y = xyEst.xHat(7);
+        xyzDebugState.xy_minus.delta_yaw = xyEst.xHat(8);
 
         xySigma = Eigen::MatrixXd(9, 1);
         xySigma(0) = 3 * sqrt(xyEst.P(0, 0));
@@ -593,9 +593,9 @@ namespace reef_estimator
         //Publish XY and Z states
         xyzState.xy_plus.x_dot = xyEst.xHat(0);
         xyzState.xy_plus.y_dot = xyEst.xHat(1);
-        xyzState.xy_plus.x = xyEst.xHat(6);
-        xyzState.xy_plus.y = xyEst.xHat(7);
-        xyzState.xy_plus.yaw = xyEst.xHat(8);
+        xyzState.xy_plus.delta_x = xyEst.xHat(6);
+        xyzState.xy_plus.delta_y = xyEst.xHat(7);
+        xyzState.xy_plus.delta_yaw = xyEst.xHat(8);
 
         xyzState.z_plus.z = zEst.xHat(0);
         xyzState.z_plus.z_dot = zEst.xHat(1);
@@ -628,9 +628,9 @@ namespace reef_estimator
             xyzDebugState.xy_plus.roll_bias = xyEst.xHat(3);
             xyzDebugState.xy_plus.xa_bias = xyEst.xHat(4);
             xyzDebugState.xy_plus.ya_bias = xyEst.xHat(5);
-            xyzDebugState.xy_plus.x = xyEst.xHat(6);
-            xyzDebugState.xy_plus.y = xyEst.xHat(7);
-            xyzDebugState.xy_plus.yaw = xyEst.xHat(8);
+            xyzDebugState.xy_plus.delta_x = xyEst.xHat(6);
+            xyzDebugState.xy_plus.delta_y = xyEst.xHat(7);
+            xyzDebugState.xy_plus.delta_yaw = xyEst.xHat(8);
             xySigma = Eigen::MatrixXd(9, 1);
             xySigma(0) = 3 * sqrt(xyEst.P(0, 0));
             xySigma(1) = 3 * sqrt(xyEst.P(1, 1));

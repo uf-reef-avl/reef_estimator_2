@@ -61,8 +61,8 @@ namespace reef_estimator
     {
         reef_msgs::roll_pitch_yaw_from_rotation321(C_NED_to_body_frame, roll, pitch, yaw);
 
-        pitch_bias = xHat(2);
-        roll_bias = xHat(3);
+        pitch_bias = xHat(3);
+        roll_bias = xHat(2);
 
         pitch_est = pitch - pitch_bias;
         roll_est = roll - roll_bias;
