@@ -606,8 +606,8 @@ namespace reef_estimator
         nav_msgs::Odometry nav_msg;
         nav_msg.header = xyzState.header;
         nav_msg.pose.pose.position.x = xyEst.xHat(6);
-        nav_msg.pose.pose.position.y = xyEst.xHat(7);
-        nav_msg.pose.pose.position.z = zEst.xHat(0);
+        nav_msg.pose.pose.position.x = xyEst.xHat(7);
+        nav_msg.pose.pose.position.x = zEst.xHat(0);
 
         double roll, pitch, yaw;
         reef_msgs::roll_pitch_yaw_from_rotation321(C_NED_to_body_frame, roll, pitch, yaw);
