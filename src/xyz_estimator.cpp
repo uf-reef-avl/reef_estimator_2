@@ -126,7 +126,8 @@ namespace reef_estimator
         }
         
         is_flying_publisher_ = nh_.advertise<std_msgs::Bool>("is_flying_reef", 1, true);
-        pose_publisher_ = nh_.advertise<nav_msgs::Odometry>("quad_pose",1);
+        odom_publisher_ = nh_.advertise<nav_msgs::Odometry>("quad/odom",1);
+        pose_publisher_ = nh_.advertise<geometry_msgs::PoseStamped>("quad/pose_stamped",1);
 
         //Initialize member variables
         accSampleAverage.x = accSampleAverage.y = accSampleAverage.z = 0;
@@ -534,8 +535,8 @@ namespace reef_estimator
         //XY estimator publisher block------------------------------------------
         xyzDebugState.xy_minus.x_dot = xyEst.xHat(0);
         xyzDebugState.xy_minus.y_dot = xyEst.xHat(1);
-        xyzDebugState.xy_minus.pitch_bias = xyEst.xHat(2);
-        xyzDebugState.xy_minus.roll_bias = xyEst.xHat(3);
+        xyzDebugState.xy_minus.pitch_bias = xyEst.xHat(3);
+        xyzDebugState.xy_minus.roll_bias = xyEst.xHat(2);
         xyzDebugState.xy_minus.xa_bias = xyEst.xHat(4);
         xyzDebugState.xy_minus.ya_bias = xyEst.xHat(5);
         xyzDebugState.xy_minus.x = xyEst.xHat(6);
@@ -605,27 +606,34 @@ namespace reef_estimator
         nav_msgs::Odometry nav_msg;
         nav_msg.header = xyzState.header;
         nav_msg.pose.pose.position.x = xyEst.xHat(6);
-        nav_msg.pose.pose.position.x = xyEst.xHat(7);
-        nav_msg.pose.pose.position.x = zEst.xHat(0);
+        nav_msg.pose.pose.position.y = xyEst.xHat(7);
+        nav_msg.pose.pose.position.z = zEst.xHat(0);
 
         double roll, pitch, yaw;
         reef_msgs::roll_pitch_yaw_from_rotation321(C_NED_to_body_frame, roll, pitch, yaw);
-        roll += xyEst.xHat(3);
-        pitch += xyEst.xHat(2);
-        yaw = xyEst.xHat(8); // TODO: Change this to integrate gyro measurements
-        //TODO: convert this to quaternions using REEF_msgs
+        roll += xyEst.xHat(2);
+        pitch += xyEst.xHat(3);
+        yaw = xyEst.xHat(8);
+        nav_msg.pose.pose.orientation = reef_msgs::fromEulerAngleToQuaternion<Eigen::Matrix<double,3,1>, geometry_msgs::Quaternion>(Eigen::Matrix<double, 3, 1>(roll,pitch,yaw), "321");
 
         nav_msg.twist.twist.linear.x = xyEst.xHat(0);
         nav_msg.twist.twist.linear.y = xyEst.xHat(1);
         nav_msg.twist.twist.linear.z = zEst.xHat(1);
+
+        odom_publisher_.publish(nav_msg);
+
+        geometry_msgs::PoseStamped pose_msg;
+        pose_msg.header = xyzState.header;
+        pose_msg.pose = nav_msg.pose.pose;
+        pose_publisher_.publish(pose_msg);
 
         if (debug_mode_)
         {
             //XY filter debug variables
             xyzDebugState.xy_plus.x_dot = xyEst.xHat(0);
             xyzDebugState.xy_plus.y_dot = xyEst.xHat(1);
-            xyzDebugState.xy_plus.pitch_bias = xyEst.xHat(2);
-            xyzDebugState.xy_plus.roll_bias = xyEst.xHat(3);
+            xyzDebugState.xy_plus.pitch_bias = xyEst.xHat(3);
+            xyzDebugState.xy_plus.roll_bias = xyEst.xHat(2);
             xyzDebugState.xy_plus.xa_bias = xyEst.xHat(4);
             xyzDebugState.xy_plus.ya_bias = xyEst.xHat(5);
             xyzDebugState.xy_plus.x = xyEst.xHat(6);
@@ -645,10 +653,10 @@ namespace reef_estimator
             xyzDebugState.xy_plus.sigma_minus[0] = xyzDebugState.xy_plus.x_dot - xySigma(0);
             xyzDebugState.xy_plus.sigma_plus[1] = xyzDebugState.xy_plus.y_dot + xySigma(1);
             xyzDebugState.xy_plus.sigma_minus[1] = xyzDebugState.xy_plus.y_dot - xySigma(1);
-            xyzDebugState.xy_plus.sigma_plus[2] = xyzDebugState.xy_plus.pitch_bias + xySigma(2);
-            xyzDebugState.xy_plus.sigma_minus[2] = xyzDebugState.xy_plus.pitch_bias - xySigma(2);
-            xyzDebugState.xy_plus.sigma_plus[3] = xyzDebugState.xy_plus.roll_bias + xySigma(3);
-            xyzDebugState.xy_plus.sigma_minus[3] = xyzDebugState.xy_plus.roll_bias - xySigma(3);
+            xyzDebugState.xy_plus.sigma_plus[2] = xyzDebugState.xy_plus.pitch_bias + xySigma(3);
+            xyzDebugState.xy_plus.sigma_minus[2] = xyzDebugState.xy_plus.pitch_bias - xySigma(3);
+            xyzDebugState.xy_plus.sigma_plus[3] = xyzDebugState.xy_plus.roll_bias + xySigma(2);
+            xyzDebugState.xy_plus.sigma_minus[3] = xyzDebugState.xy_plus.roll_bias - xySigma(2);
             xyzDebugState.xy_plus.sigma_plus[4] = xyzDebugState.xy_plus.xa_bias + xySigma(4);
             xyzDebugState.xy_plus.sigma_minus[4] = xyzDebugState.xy_plus.xa_bias - xySigma(4);
             xyzDebugState.xy_plus.sigma_plus[5] = xyzDebugState.xy_plus.ya_bias + xySigma(5);

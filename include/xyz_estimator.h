@@ -17,6 +17,8 @@
 #include <reef_msgs/XYZDebugEstimate.h>
 #include <reef_msgs/XYZEstimate.h>
 #include <reef_msgs/DeltaToVel.h>
+#include <reef_msgs/AngleRepresentationInterface.h>
+#include <reef_msgs/ReefMsgsConversionAPI.h>
 
 #include "z_estimator.h"
 #include "xy_estimator.h"
@@ -42,6 +44,7 @@ namespace reef_estimator
         ros::Publisher debug_state_publisher_;
         ros::Publisher is_flying_publisher_;
         ros::Publisher pose_publisher_;
+        ros::Publisher odom_publisher_;
         //Estimator enable/disable variables
         bool enableXY;
         bool enableZ;
