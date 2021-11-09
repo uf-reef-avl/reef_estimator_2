@@ -36,9 +36,9 @@ namespace reef_estimator
              0.0;
 
         H = Eigen::MatrixXd(3,12);
-        H <<  0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0,
-              0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0,
-              0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0;
+        H <<  0, 0, 0, 0, 0, 0, 1.0, 0, 0, 0, 0, 0,
+              0, 0, 0, 0, 0, 0, 0, 1.0, 0, 0, 0, 0,
+              0, 0, 0, 0, 0, 0, 0, 0, 1.0, 0, 0, 0;
 
         xHat0 = Eigen::MatrixXd(12,1);
         xHat = Eigen::MatrixXd(12,1);
@@ -59,6 +59,8 @@ namespace reef_estimator
         ROS_WARN_STREAM("[REEF EST]:: Body to camera \n" << body_to_camera.matrix());
         //Initialize the keyframe
         C_body_to_camera = body_to_camera.linear().transpose();
+
+        ROS_WARN_STREAM("[C]:: Body to camera \n" << C_body_to_camera);
         relativeReset_publisher_ = nh_.advertise<geometry_msgs::Vector3>("deltaState", 1, true);
         keyframe_now = nh_.advertise<std_msgs::Empty>("keyframe_now",1);
 
@@ -82,12 +84,16 @@ namespace reef_estimator
 
         pitch_est = pitch - pitch_bias;
         roll_est = roll - roll_bias;
-
-
-        C_body_level_to_body_frame << cos(pitch_est), 0, -sin(pitch_est),
+        //Pitch and roll
+                C_body_level_to_body_frame << cos(pitch_est), 0, -sin(pitch_est),
                 sin(roll_est) * sin(pitch_est), cos(roll_est), sin(roll_est) * cos(pitch_est),
                 cos(roll_est) * sin(pitch_est), -sin(roll_est), cos(roll_est) * cos(pitch_est);
 
+        Eigen::Matrix3d C3;
+        C3<< cos(xHat(YAW)), sin(xHat(YAW)), 0,
+             -sin(xHat(YAW)), cos(xHat(YAW)), 0,
+             0,                           0    ,       1;
+//        C_body_level_to_body_frame= C_body_level_to_body_frame*C3;
 
         Eigen::MatrixXd C_body_level_to_body_frame_2x2(2, 2);
         C_body_level_to_body_frame_2x2 = C_body_level_to_body_frame.block<2, 2>(0, 0);
@@ -121,7 +127,7 @@ namespace reef_estimator
         xy_time_update = nonLinearDynamics * dt;
 
         Eigen::Vector3d gyro_in_body_level_frame;
-        gyro_in_body_level_frame = C_NED_to_body_frame.transpose() *( gyroxyz_in_body_frame - xHat.block<3,1>(BGX,0));
+        gyro_in_body_level_frame = C_body_level_to_body_frame.transpose() *( gyroxyz_in_body_frame + xHat.block<3,1>(BGX,0));
 
         xHat << xHat(0) + xy_time_update(0),
                 xHat(1) + xy_time_update(1),
@@ -223,16 +229,19 @@ namespace reef_estimator
         global_x = global_pose.translation().x();
         global_y = global_pose.translation().y();
         reef_msgs::get_yaw(global_pose.linear().transpose(), global_yaw);
-        if(global_yaw<0.0){
-            global_yaw += 2*M_PI;
+        if(global_yaw<-2.0*M_PI){
+            global_yaw += 2.0*M_PI;
+        }
+        else if(global_yaw>2.0*M_PI){
+            global_yaw -= 2.0*M_PI;
         }
 
 
         distance = sqrt(pow(xHat(6), 2) + pow(xHat(7), 2));
         if ((XYTakeoff && (distance > dPoseLimit)) || (XYTakeoff && (xHat(8) > dYawLimit))) {
             //Save attitudes at the time of keyframe
-            C_keyframe_to_level_keyframe_at_keyframe_time = reef_msgs::DCM_from_Euler321(Eigen::Vector3d (0, 0, xHat(YAW))) * C_body_level_to_body_frame.transpose() * C_body_to_camera.transpose();
-            XYEstimator::relativeReset(xHat, P);
+//            C_keyframe_to_level_keyframe_at_keyframe_time = reef_msgs::DCM_from_Euler321(Eigen::Vector3d (0, 0, xHat(YAW))) * C_body_level_to_body_frame.transpose() * C_body_to_camera.transpose();
+//            XYEstimator::relativeReset(xHat, P);
         }
 
     }
@@ -249,15 +258,15 @@ namespace reef_estimator
         xHat = xHat0;
 
 
-        // Initial delta test
-        global_x = xHat0(6);
-        global_y = xHat0(7);
-        global_yaw = xHat0(8);
+//        // Initial delta test
+//        global_x = xHat0(6);
+//        global_y = xHat0(7);
+//        global_yaw = xHat0(8);
     }
 
 
     void XYEstimator::relativeReset(Eigen::MatrixXd &xHat, Eigen::MatrixXd &P){
-
+        ROS_WARN_STREAM("STATE RESET");
         std_msgs::Empty empty;
         keyframe_now.publish(empty);
 

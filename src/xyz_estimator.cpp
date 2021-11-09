@@ -64,7 +64,7 @@ namespace reef_estimator
         ROS_WARN_STREAM("Mahalanobis Distance for Mocap Z " << mahalanobis_distance_mocap_z);
         ROS_WARN_STREAM("Mahalanobis Distance for Mocap Velocity "  << mahalanobis_distance_mocap_xy_);
         // Initialize dt
-        private_nh_.param<double>("estimator_dt", dt, 0.002);
+        private_nh_.param<double>("estimator_dt", dt, 0.004);
         xyEst.dt = zEst.dt = dt;
 
         //Initialize estimators with parameters
@@ -80,7 +80,6 @@ namespace reef_estimator
         private_nh_.param<double>("delta_yaw_limit", xyEst.dYawLimit, 0.7);
         private_nh_.param<double>("delta_time_limit", xyEst.dTimeLimit, 100.0);
 
-        xyEst.initialize();//Initialize P,R and beta.
 
         //Initialization of the first frame with MOCAP
         double roll_init, pitch_init, yaw_init;
@@ -91,16 +90,18 @@ namespace reef_estimator
         if (pose_msg != NULL) {
             ROS_INFO_STREAM("GOT MY FIRST MOCAP MESSAGE");
             reef_msgs::roll_pitch_yaw_from_quaternion(pose_msg->pose.orientation,roll_init, pitch_init, yaw_init);
-            xyEst.xHat0(xyEst.PX) = pose_msg->pose.position.x;
-            xyEst.xHat0(xyEst.PY) = pose_msg->pose.position.y;
+            xyEst.xHat0.setZero();
             xyEst.xHat0(xyEst.YAW) = yaw_init;
-            ROS_WARN_STREAM(xyEst.xHat0);
 
         }
         xyEst.global_pose.linear() = reef_msgs::DCM_from_Euler321(Eigen::Vector3d (0,0,yaw_init)).transpose();
-        xyEst.global_pose.translation() = Eigen::Vector3d (xyEst.xHat0(xyEst.PX),xyEst.xHat0(xyEst.PY),0);
+        xyEst.global_pose.translation() = Eigen::Vector3d (pose_msg->pose.position.x,pose_msg->pose.position.y,0.0);
+        xyEst.XYTakeoff = false;
+        //Initialize the keyframe
+        xyEst.C_keyframe_to_level_keyframe_at_keyframe_time.setIdentity();
 
-
+        xyEst.initialize();//Initialize P,R and beta.
+        ROS_WARN_STREAM("Filter initialized with:\t"<<xyEst.xHat);
 
         //Save the initial covariances for relative states XY and yaw
 
@@ -115,10 +116,6 @@ namespace reef_estimator
         zEst.updateLinearModel();
         zEst.initialize();
         zEst.setTakeoffState(false);
-        xyEst.XYTakeoff = false;
-
-     //Initialize the keyframe
-        xyEst.C_keyframe_to_level_keyframe_at_keyframe_time = reef_msgs::DCM_from_Euler321(Eigen::Vector3d (0, 0, xyEst.xHat(xyEst.YAW))) * xyEst.C_body_level_to_body_frame.transpose() * xyEst.C_body_to_camera.transpose();
 
 
 
@@ -543,7 +540,7 @@ namespace reef_estimator
 
         xyzPose.pose.position.x = xyEst.global_x;
         xyzPose.pose.position.y = xyEst.global_y;
-        xyzPose.pose.position.z = xyEst.global_yaw;
+        xyzPose.pose.position.z = 57.3*xyEst.global_yaw;
         xyzPose.header = xyzState.header;
 
         reef_msgs::quaternion_from_roll_pitch_yaw(xyEst.roll_est, xyEst.pitch_est, xyEst.global_yaw, xyzPose.pose.orientation);

@@ -1,5 +1,5 @@
 {
-#State: x, y, yaw, xdot,  ydot,  roll_bias,  pitch_bias, yaw_bias,  accX_bias,  accY_bias.
+#State: xdot,  ydot,  roll_bias,  pitch_bias,  accX_bias,  accY_bias.
 
 
 xy_P0: [
@@ -20,12 +20,12 @@ xy_P0: [
 
 
 xy_Q: [
-   0.1,     0,      0,      0,      0,      0,      0,      0,      0,     0,     0,     0,
-    0,    0.1,      0,      0,      0,      0,      0,      0,      0,     0,     0,     0,
+   0.0,     0,      0,      0,      0,      0,      0,      0,      0,     0,     0,     0,
+    0,    0.0,      0,      0,      0,      0,      0,      0,      0,     0,     0,     0,
     0,     0,   0.03,      0,      0,      0,      0,      0,      0,     0,     0,     0,
     0,     0,      0,   0.03,      0,      0,      0,      0,      0,     0,     0,     0, 
-    0,     0,      0,      0,    0.1,      0,      0,      0,      0,     0,     0,     0,
-    0,     0,      0,      0,      0,    0.1,      0,      0,      0,     0,     0,     0,
+    0,     0,      0,      0,    0.01,      0,      0,      0,      0,     0,     0,     0,
+    0,     0,      0,      0,      0,    0.01,      0,      0,      0,     0,     0,     0,
     0,     0,      0,      0,      0,      0,     0.01,      0,      0,     0,     0,     0,
     0,     0,      0,      0,      0,      0,      0,     0.01,      0,     0,     0,     0,
     0,     0,      0,      0,      0,      0,      0,      0,     0.01,     0,     0,     0,
@@ -47,9 +47,9 @@ xy_Q: [
 #When using RGBD R is set dynamically.
 #When using MOCAP this is the value that R takes.
 xy_R0: [
-  0.1,   0,   0,
-  0,   0.1,   0,
-  0,     0,  0.1
+  0.001,   0,   0,
+  0,   0.001,   0,
+  0,     0,  0.001
 ],
 #Partial Update
 #xdot,  ydot,  roll_bias,  pitch_bias,  accX_bias,  accY_bias.
@@ -57,7 +57,7 @@ xy_x0: [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
 xy_beta: [1, 1, 0.03, 0.03, 0.001, 0.001, 1, 1, 1, 0.001, 0.001, 0.001], #BEst plot until now
 
 #Relative State Parameters
-delta_pose_limit: 0.25,
-delta_yaw_limit: 1.0,
+delta_pose_limit: 1000.0,
+delta_yaw_limit: 1000.0,
 delta_time_limit: 1000.0
 }
