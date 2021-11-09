@@ -24,8 +24,6 @@
             enable_mocap_z: true
         </rosparam>
         <remap from="mocap_ned" to="pose_stamped"/>
-        <remap from="mocap_velocity/body_level_frame" to="velocity/body_level_frame"/>
-        <remap from="rgbd_velocity_body_frame" to="rgbd_to_velocity/body_level_frame"/>
     </node>
 
     <node name="delta_odom" pkg="delta_odom" type="node" output="screen" >
