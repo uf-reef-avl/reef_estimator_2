@@ -92,19 +92,17 @@ namespace reef_estimator
             reef_msgs::roll_pitch_yaw_from_quaternion(pose_msg->pose.orientation,roll_init, pitch_init, yaw_init);
             xyEst.xHat0.setZero();
             xyEst.xHat0(xyEst.YAW) = yaw_init;
-
         }
         xyEst.global_pose.linear() = reef_msgs::DCM_from_Euler321(Eigen::Vector3d (0,0,yaw_init)).transpose();
         xyEst.global_pose.translation() = Eigen::Vector3d (pose_msg->pose.position.x,pose_msg->pose.position.y,0.0);
         xyEst.XYTakeoff = false;
         //Initialize the keyframe
-        xyEst.C_keyframe_to_level_keyframe_at_keyframe_time.setIdentity();
+        xyEst.C_level_keyframe_to_body_keyframe_at_k = reef_msgs::DCM_from_Euler321(Eigen::Vector3d(roll_init, pitch_init, 0));
 
         xyEst.initialize();//Initialize P,R and beta.
         ROS_WARN_STREAM("Filter initialized with:\t"<<xyEst.xHat);
 
         //Save the initial covariances for relative states XY and yaw
-
         reef_msgs::importMatrixFromParamServer(private_nh_, zEst.xHat0, "z_x0");
         reef_msgs::importMatrixFromParamServer(private_nh_, zEst.P0, "z_P0");
         reef_msgs::importMatrixFromParamServer(private_nh_, zEst.P0forFlying, "z_P0_flying");
@@ -248,10 +246,10 @@ namespace reef_estimator
 
         if (enableXY && newDeltaMeasurement) {
             if(enable_partial_update) {
-//                xyEst.partialUpdate();
+                xyEst.partialUpdate();
             }
             else{
-//                xyEst.update();
+                xyEst.update();
             }
             newDeltaMeasurement = false;
         }
@@ -292,17 +290,19 @@ namespace reef_estimator
         Eigen::Matrix3d delta_C;
         delta_C = reef_msgs::quaternion_to_rotation(pose_msg.orientation);
 
-        Eigen::Vector3d delta_position_camera_frame;
-        delta_position_camera_frame<< pose_msg.position.x, pose_msg.position.y, 0.0;
-        Eigen::Vector3d delta_position_body_level;
-        delta_position_body_level << xyEst.C_keyframe_to_level_keyframe_at_keyframe_time * delta_position_camera_frame;
+        Eigen::Vector3d delta_p_camera_frame;
+        delta_p_camera_frame << pose_msg.position.x, pose_msg.position.y, pose_msg.position.z;
+        Eigen::Vector3d delta_p_body_level_k_to_body_level_kplus1;
+        Eigen::Vector3d p_camera_in_body_frame;
+        p_camera_in_body_frame << 0,0,0;
+        delta_p_body_level_k_to_body_level_kplus1 << xyEst.C_level_keyframe_to_body_keyframe_at_k.transpose() *( p_camera_in_body_frame + xyEst.C_body_to_camera.transpose() * ( delta_p_camera_frame + delta_C.transpose()*xyEst.C_body_to_camera*(-p_camera_in_body_frame)) );
 
-        Eigen::Matrix3d delta_C_level_to_next_level_frame;
-        delta_C_level_to_next_level_frame = xyEst.C_keyframe_to_level_keyframe_at_keyframe_time.transpose() * delta_C;
+        Eigen::Matrix3d delta_C_level_k_to_level_kplus1;
+        delta_C_level_k_to_level_kplus1 = xyEst.C_body_level_to_body_frame.transpose() * xyEst.C_body_to_camera.transpose() * delta_C * xyEst.C_body_to_camera * xyEst.C_level_keyframe_to_body_keyframe_at_k;
         double delta_yaw;
-        reef_msgs::get_yaw(delta_C_level_to_next_level_frame,delta_yaw);
+        reef_msgs::get_yaw(delta_C_level_k_to_level_kplus1, delta_yaw);
 
-        xyEst.z << delta_position_body_level(0), delta_position_body_level(1), delta_yaw;
+        xyEst.z << delta_p_body_level_k_to_body_level_kplus1(0), delta_p_body_level_k_to_body_level_kplus1(1), delta_yaw;
 
 //TODO: Include the rejection scheme for the delta measurements.
 //        if (chi2AcceptDeltaPose(pose_msg)){

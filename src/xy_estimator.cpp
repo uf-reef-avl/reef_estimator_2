@@ -127,7 +127,13 @@ namespace reef_estimator
         xy_time_update = nonLinearDynamics * dt;
 
         Eigen::Vector3d gyro_in_body_level_frame;
-        gyro_in_body_level_frame = C_body_level_to_body_frame.transpose() *( gyroxyz_in_body_frame + xHat.block<3,1>(BGX,0));
+//        gyro_in_body_level_frame = C_body_level_to_body_frame.transpose() *( gyroxyz_in_body_frame + xHat.block<3,1>(BGX,0));
+
+        Eigen::Matrix3d A;//Attitude influence matrix 321ypr (only third row). Kinematic singularity at pitch_est = 90deg
+        A << 0,0,0,
+             0,0,0,
+             0, sin(roll_est)/cos(pitch_est),cos(roll_est)/cos(pitch_est);
+        gyro_in_body_level_frame = A*( gyroxyz_in_body_frame + xHat.block<3,1>(BGX,0));
 
         xHat << xHat(0) + xy_time_update(0),
                 xHat(1) + xy_time_update(1),
@@ -236,11 +242,10 @@ namespace reef_estimator
             global_yaw -= 2.0*M_PI;
         }
 
-
         distance = sqrt(pow(xHat(6), 2) + pow(xHat(7), 2));
         if ((XYTakeoff && (distance > dPoseLimit)) || (XYTakeoff && (xHat(8) > dYawLimit))) {
-            //Save attitudes at the time of keyframe
-//            C_keyframe_to_level_keyframe_at_keyframe_time = reef_msgs::DCM_from_Euler321(Eigen::Vector3d (0, 0, xHat(YAW))) * C_body_level_to_body_frame.transpose() * C_body_to_camera.transpose();
+            //Save attitude at the time of keyframe
+            C_level_keyframe_to_body_keyframe_at_k = C_body_level_to_body_frame;
 //            XYEstimator::relativeReset(xHat, P);
         }
 
@@ -250,18 +255,10 @@ namespace reef_estimator
     {
         //Reset covariance P
         P = P0;
-//        reef_msgs::roll_pitch_yaw_from_quaternion(orient0,phi, theta, psi);
-//        roll = phi;
-//        pitch = theta;
 
         //Reset velocity estimate
         xHat = xHat0;
 
-
-//        // Initial delta test
-//        global_x = xHat0(6);
-//        global_y = xHat0(7);
-//        global_yaw = xHat0(8);
     }
 
 
