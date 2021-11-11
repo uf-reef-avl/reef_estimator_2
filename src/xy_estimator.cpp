@@ -246,7 +246,7 @@ namespace reef_estimator
         if ((XYTakeoff && (distance > dPoseLimit)) || (XYTakeoff && (xHat(8) > dYawLimit))) {
             //Save attitude at the time of keyframe
             C_level_keyframe_to_body_keyframe_at_k = C_body_level_to_body_frame;
-//            XYEstimator::relativeReset(xHat, P);
+            XYEstimator::relativeReset(xHat, P);
         }
 
     }
@@ -255,7 +255,6 @@ namespace reef_estimator
     {
         //Reset covariance P
         P = P0;
-
         //Reset velocity estimate
         xHat = xHat0;
 

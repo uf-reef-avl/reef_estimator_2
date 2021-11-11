@@ -31,4 +31,8 @@
         <!--		<remap from="odom" to="multirotor/truth/NED"/> -->
     </node>
 
+    <node pkg="reef2_truth" type="node" name="reef_2_truth">
+        <rosparam file="$(find reef2_truth)/params/basic.yaml" />
+    </node>
+
 </launch>
