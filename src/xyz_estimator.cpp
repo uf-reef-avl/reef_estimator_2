@@ -91,13 +91,14 @@ namespace reef_estimator
             ROS_INFO_STREAM("GOT MY FIRST MOCAP MESSAGE");
             reef_msgs::roll_pitch_yaw_from_quaternion(pose_msg->pose.orientation,roll_init, pitch_init, yaw_init);
             xyEst.xHat0.setZero();
-            xyEst.xHat0(xyEst.YAW) = yaw_init;
+            xyEst.xHat0(xyEst.YAW) = 0;
         }
         xyEst.global_pose.linear() = reef_msgs::DCM_from_Euler321(Eigen::Vector3d (0,0,yaw_init)).transpose();
         xyEst.global_pose.translation() = Eigen::Vector3d (pose_msg->pose.position.x,pose_msg->pose.position.y,0.0);
         xyEst.XYTakeoff = false;
         //Initialize the keyframe
         xyEst.C_level_keyframe_to_body_keyframe_at_k = reef_msgs::DCM_from_Euler321(Eigen::Vector3d(roll_init, pitch_init, 0));
+        tf2::fromMsg(pose_msg->pose, xyEst.global_pose_p);
 
         xyEst.initialize();//Initialize P,R and beta.
         ROS_WARN_STREAM("Filter initialized with:\t"<<xyEst.xHat);
@@ -537,13 +538,30 @@ namespace reef_estimator
 
         state_publisher_.publish(xyzState);
 
+        xyEst.Delta.header = xyzState.header;
+//        xyzPose.pose.position.x = xyEst.global_x;
+//        xyzPose.pose.position.y = xyEst.global_y;
+//        xyzPose.pose.position.z = 57.3*xyEst.global_yaw;
+//        xyzPose.header = xyzState.header;
+//
+//        reef_msgs::quaternion_from_roll_pitch_yaw(xyEst.roll_est, xyEst.pitch_est, xyEst.global_yaw, xyzPose.pose.orientation);
 
-        xyzPose.pose.position.x = xyEst.global_x;
-        xyzPose.pose.position.y = xyEst.global_y;
-        xyzPose.pose.position.z = 57.3*xyEst.global_yaw;
+        Eigen::Affine3d delta_pose_wrt_keyframe_in_BL_frame;
+        Eigen::Affine3d body_level_to_body_frame;
+        body_level_to_body_frame.linear() = xyEst.C_body_level_to_body_frame.transpose();
+        body_level_to_body_frame.translation() = Eigen::Vector3d::Zero();
+        delta_pose_wrt_keyframe_in_BL_frame.translation() = Eigen::Vector3d(xyEst.xHat(xyEst.PX), xyEst.xHat(xyEst.PY), 0 );
+        delta_pose_wrt_keyframe_in_BL_frame.linear() = reef_msgs::fromEulerAngleToRotationMatrix<Eigen::Matrix<double,3,1>, Eigen::Matrix<double,3,3>>(Eigen::Matrix<double,3,1>(
+                0, 0, xyEst.xHat(xyEst.YAW)));
+        Eigen::Affine3d delta_pose_in_body_frame;
+        delta_pose_in_body_frame = delta_pose_wrt_keyframe_in_BL_frame * body_level_to_body_frame;
+        Eigen::Affine3d body_in_optitrack_frame;
+        body_in_optitrack_frame = xyEst.global_pose_p *  delta_pose_in_body_frame;
+        xyzPose.pose = tf2::toMsg(body_in_optitrack_frame);
         xyzPose.header = xyzState.header;
+        xyzPose.pose.position.z = zEst.xHat(0);
 
-        reef_msgs::quaternion_from_roll_pitch_yaw(xyEst.roll_est, xyEst.pitch_est, xyEst.global_yaw, xyzPose.pose.orientation);
+
 
         pose_publisher_.publish(xyzPose);
 

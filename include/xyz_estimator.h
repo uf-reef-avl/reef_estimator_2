@@ -16,6 +16,7 @@
 #include <reef_msgs/XYZDebugEstimate.h>
 #include <reef_msgs/XYZEstimate.h>
 #include <reef_msgs/DeltaToVel.h>
+#include <reef_msgs/ReefMsgsConversionAPI.h>
 
 #include "z_estimator.h"
 #include "xy_estimator.h"

@@ -61,7 +61,7 @@ namespace reef_estimator
         C_body_to_camera = body_to_camera.linear().transpose();
 
         ROS_WARN_STREAM("[C]:: Body to camera \n" << C_body_to_camera);
-        relativeReset_publisher_ = nh_.advertise<geometry_msgs::Vector3>("deltaState", 1, true);
+        relativeReset_publisher_ = nh_.advertise<geometry_msgs::PoseStamped>("deltaState", 1, true);
         keyframe_now = nh_.advertise<std_msgs::Empty>("keyframe_now",1);
 
 
@@ -245,8 +245,8 @@ namespace reef_estimator
         distance = sqrt(pow(xHat(6), 2) + pow(xHat(7), 2));
         if ((XYTakeoff && (distance > dPoseLimit)) || (XYTakeoff && (xHat(8) > dYawLimit))) {
             //Save attitude at the time of keyframe
-            C_level_keyframe_to_body_keyframe_at_k = C_body_level_to_body_frame;
             XYEstimator::relativeReset(xHat, P);
+            C_level_keyframe_to_body_keyframe_at_k = C_body_level_to_body_frame;
         }
 
     }
@@ -266,16 +266,36 @@ namespace reef_estimator
         std_msgs::Empty empty;
         keyframe_now.publish(empty);
 
-        Eigen::Affine3d current_delta;
-        current_delta.translation() = Eigen::Vector3d(xHat(PX), xHat(PY),0);
-        current_delta.linear() = reef_msgs::DCM_from_Euler321(Eigen::Vector3d(0,0,xHat(YAW))).transpose();
+//        Eigen::Affine3d current_delta;
+//        current_delta.translation() = Eigen::Vector3d(xHat(PX), xHat(PY),0);
+//        current_delta.linear() = reef_msgs::DCM_from_Euler321(Eigen::Vector3d(0,0,xHat(YAW))).transpose();
 //This line integrates the total delta from the one keyframe to the next.
         //global_pose = global_pose*current_delta;
+        Eigen::Affine3d keyframe_delta;
+        keyframe_delta.translation() = Eigen::Vector3d(xHat(PX), xHat(PY),0);
+        keyframe_delta.linear() = reef_msgs::fromEulerAngleToRotationMatrix<Eigen::Matrix<double,3,1>, Eigen::Matrix<double,3,3>>(Eigen::Matrix<double,3,1>(
+                0, 0, xHat(YAW)));
+
+        Eigen::Affine3d body_level_to_body_frame;
+        body_level_to_body_frame.linear() = C_body_level_to_body_frame.transpose();
+        body_level_to_body_frame.translation() = Eigen::Vector3d::Zero();
+
+        Eigen::Affine3d body_level_to_body_frame_at_keyframe_time;
+        body_level_to_body_frame_at_keyframe_time.linear() = C_level_keyframe_to_body_keyframe_at_k.transpose();
+        body_level_to_body_frame_at_keyframe_time.translation() = Eigen::Vector3d::Zero();
+
+        keyframe_in_body_frame = body_level_to_body_frame_at_keyframe_time.inverse() * keyframe_delta * body_level_to_body_frame;
+        Eigen::Affine3d temp;
+        temp = global_pose_p * keyframe_in_body_frame;
+        global_pose_p = temp;
 
         // Publish current position and heading to topic to be read from backend compiler here (reset to zero after)
-        Delta.x = xHat(PX);
-        Delta.y = xHat(PY);
-        Delta.z = xHat(YAW);
+//        Delta.pose.position.x = xHat(PX);
+//        Delta.pose.position.y = xHat(PY);
+//        Delta.pose.position.z = xHat(YAW);
+        Delta.pose.position.x = global_pose_p.translation().x();
+        Delta.pose.position.y = global_pose_p.translation().y();
+//        Delta.pose.position.z = xHat(YAW);
 
         relativeReset_publisher_.publish(Delta);
 

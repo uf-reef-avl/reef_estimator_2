@@ -8,6 +8,7 @@
 #include "estimator.h"
 #include "../../reef_msgs/include/reef_msgs/dynamics.h"
 #include <std_msgs/Empty.h>
+#include <reef_msgs/ReefMsgsConversionAPI.h>
 
 
 namespace reef_estimator
@@ -38,7 +39,9 @@ namespace reef_estimator
         Eigen::Vector3d nonLinearDynamics;
         Eigen::Matrix2d Id;
         Eigen::Affine3d global_pose;
-        
+        Eigen::Affine3d global_pose_p;
+        Eigen::Affine3d keyframe_in_body_frame;
+
         // orientation variables 
         double pitch;
         double roll;
@@ -75,7 +78,7 @@ namespace reef_estimator
         double accum_y_vel;
 	
 	// msg if want to publish deltas
-        geometry_msgs::Vector3 Delta;
+        geometry_msgs::PoseStamped Delta;
 
         bool XYTakeoff;
 
