@@ -4,6 +4,7 @@
 
 #include "xyz_estimator.h"
 #include <iostream>
+
 namespace reef_estimator
 {
     XYZEstimator::XYZEstimator() : private_nh_("~"),
@@ -56,11 +57,12 @@ namespace reef_estimator
         private_nh_.param<double>("mahalanobis_d_sonar", mahalanobis_distance_sonar, 20);
         private_nh_.param<double>("mahalanobis_d_rgbd_velocity", mahalanobis_distance_rgbd_xy_, 20);
         private_nh_.param<double>("mahalanobis_d_mocap_z", mahalanobis_distance_mocap_z, 20);
-        private_nh_.param<double>("mahalanobis_d_mocap_velocity", mahalanobis_distance_mocap_xy_, 20);
+        private_nh_.param<double>("mahalanobis_distance_mocap_xy_", mahalanobis_distance_mocap_xy_, 20);
         private_nh_.param<bool>("enable_partial_update", enable_partial_update, true);
 
         ROS_WARN_STREAM("Mahalanobis Distance for Sonar " << mahalanobis_distance_sonar);
         ROS_WARN_STREAM("Mahalanobis Distance for RGBD Velocity " << mahalanobis_distance_rgbd_xy_);
+        ROS_WARN_STREAM("Mahalanobis Distance for XYYaw Delta Mocap " << mahalanobis_distance_mocap_xy_);
         ROS_WARN_STREAM("Mahalanobis Distance for Mocap Z " << mahalanobis_distance_mocap_z);
         ROS_WARN_STREAM("Mahalanobis Distance for Mocap Velocity "  << mahalanobis_distance_mocap_xy_);
         // Initialize dt
@@ -73,7 +75,7 @@ namespace reef_estimator
         reef_msgs::importMatrixFromParamServer(private_nh_, xyEst.Q, "xy_Q");
         reef_msgs::importMatrixFromParamServer(private_nh_, xyEst.R0, "xy_R0");
         reef_msgs::importMatrixFromParamServer(private_nh_, xyEst.betaVector, "xy_beta");
-        xyEst.Q *= (xyEst.dt*xyEst.dt);
+//        xyEst.Q *= (xyEst.dt*xyEst.dt);
 
         //Get the constraint to implement relative reset from yaml file
         private_nh_.param<double>("delta_pose_limit", xyEst.dPoseLimit, 0.5);
@@ -90,7 +92,7 @@ namespace reef_estimator
         if (pose_msg != NULL) {
             ROS_INFO_STREAM("GOT MY FIRST MOCAP MESSAGE");
             reef_msgs::roll_pitch_yaw_from_quaternion(pose_msg->pose.orientation,roll_init, pitch_init, yaw_init);
-            xyEst.xHat0.setZero();
+
             xyEst.xHat0(xyEst.YAW) = 0;
         }
         xyEst.global_pose.linear() = reef_msgs::DCM_from_Euler321(Eigen::Vector3d (0,0,yaw_init)).transpose();
@@ -120,7 +122,8 @@ namespace reef_estimator
 
         state_publisher_ = nh_.advertise<reef_msgs::XYZEstimate>("xyz_estimate", 1, true);
         pose_publisher_ =  nh_.advertise<geometry_msgs::PoseStamped>("xyz_pose", 1, true);
-        
+        delta_measurement_publisher_ =  nh_.advertise<geometry_msgs::PoseStamped>("delta_measurement", 1, true);
+
         if (debug_mode_) {
             debug_state_publisher_ = nh_.advertise<reef_msgs::XYZDebugEstimate>("xyz_debug_estimate", 1, true);
 
@@ -285,18 +288,17 @@ namespace reef_estimator
     }
 
     //Mocap XY Pose update
-    void XYZEstimator::deltaPoseUpdate(geometry_msgs::Pose pose_msg){
+    void XYZEstimator::deltaPoseUpdate(geometry_msgs::PoseStamped pose_msg){
         // TODO: Humberto please do all the coordinate frame transforms. It needs to go before chi2 rejection
 
         Eigen::Matrix3d delta_C;
-        delta_C = reef_msgs::quaternion_to_rotation(pose_msg.orientation);
+        delta_C = reef_msgs::quaternion_to_rotation(pose_msg.pose.orientation);
 
         Eigen::Vector3d delta_p_camera_frame;
-        delta_p_camera_frame << pose_msg.position.x, pose_msg.position.y, pose_msg.position.z;
+        delta_p_camera_frame << pose_msg.pose.position.x, pose_msg.pose.position.y, pose_msg.pose.position.z;
         Eigen::Vector3d delta_p_body_level_k_to_body_level_kplus1;
-        Eigen::Vector3d p_camera_in_body_frame;
-        p_camera_in_body_frame << 0,0,0;
-        delta_p_body_level_k_to_body_level_kplus1 << xyEst.C_level_keyframe_to_body_keyframe_at_k.transpose() *( p_camera_in_body_frame + xyEst.C_body_to_camera.transpose() * ( delta_p_camera_frame + delta_C.transpose()*xyEst.C_body_to_camera*(-p_camera_in_body_frame)) );
+//        ROS_WARN_STREAM("BODY TO CAM P"<<xyEst.p_body_to_camera);
+        delta_p_body_level_k_to_body_level_kplus1 << xyEst.C_level_keyframe_to_body_keyframe_at_k.transpose() *( xyEst.p_body_to_camera + xyEst.C_body_to_camera.transpose() * ( delta_p_camera_frame + delta_C.transpose()*xyEst.C_body_to_camera*(-xyEst.p_body_to_camera)) );
 
         Eigen::Matrix3d delta_C_level_k_to_level_kplus1;
         delta_C_level_k_to_level_kplus1 = xyEst.C_body_level_to_body_frame.transpose() * xyEst.C_body_to_camera.transpose() * delta_C * xyEst.C_body_to_camera * xyEst.C_level_keyframe_to_body_keyframe_at_k;
@@ -304,11 +306,17 @@ namespace reef_estimator
         reef_msgs::get_yaw(delta_C_level_k_to_level_kplus1, delta_yaw);
 
         xyEst.z << delta_p_body_level_k_to_body_level_kplus1(0), delta_p_body_level_k_to_body_level_kplus1(1), delta_yaw;
+        //This message is just to perform the Chi2 rejection.
+        delta_msg.header = pose_msg.header;
+        delta_msg.pose.position.x =   xyEst.z(0);
+        delta_msg.pose.position.y =   xyEst.z(1);
+        delta_msg.pose.position.z =   xyEst.z(2);
+        delta_measurement_publisher_.publish(delta_msg);
 
 //TODO: Include the rejection scheme for the delta measurements.
-//        if (chi2AcceptDeltaPose(pose_msg)){
+        if (chi2AcceptDeltaPose(delta_msg)){
             newDeltaMeasurement = true;
-//        }
+        }
     }
 
     bool XYZEstimator::chi2Accept(float range_measurement) 
@@ -338,17 +346,17 @@ namespace reef_estimator
         }
     }
 
-    bool XYZEstimator::chi2AcceptDeltaPose(geometry_msgs::Pose pose){
+    bool XYZEstimator::chi2AcceptDeltaPose(geometry_msgs::PoseStamped pose){
         //Compute Mahalanobis distance.
-        Eigen::Vector2d measurement;
-        measurement << pose.position.x, pose.position.y;
+        Eigen::Vector3d measurement;
+        measurement << pose.pose.position.x, pose.pose.position.y, pose.pose.position.z;
 
-        Eigen::Vector2d expected_rgbd;
-        expected_rgbd = xyEst.H * xyEst.xHat;
-        Eigen::MatrixXd S(1, 1);
+        Eigen::Vector3d expected_vo;
+        expected_vo = xyEst.H * xyEst.xHat;
+        Eigen::MatrixXd S(3, 3);
 
         S = xyEst.H * xyEst.P * xyEst.H.transpose() + xyEst.R;
-        Mahalanobis_D_hat_square(0) = (measurement - expected_rgbd).transpose() * S.inverse() * (measurement - expected_rgbd);
+        Mahalanobis_D_hat_square(0) = (measurement - expected_vo).transpose() * S.inverse() * (measurement - expected_vo);
         Mahalanobis_D_hat(0) = sqrt(Mahalanobis_D_hat_square(0));
         //Value for 99% we need 6.63.
         //Value for 95% we 3.84
@@ -458,8 +466,8 @@ namespace reef_estimator
 
         xyzDebugState.xy_minus.x_dot = xyEst.xHat(0);
         xyzDebugState.xy_minus.y_dot = xyEst.xHat(1);
-        xyzDebugState.xy_minus.pitch_bias = xyEst.xHat(2);
-        xyzDebugState.xy_minus.roll_bias = xyEst.xHat(3);
+        xyzDebugState.xy_minus.pitch_bias = xyEst.xHat(xyEst.BP);
+        xyzDebugState.xy_minus.roll_bias = xyEst.xHat(xyEst.BR);
         xyzDebugState.xy_minus.xa_bias = xyEst.xHat(4);
         xyzDebugState.xy_minus.ya_bias = xyEst.xHat(5);
         xyzDebugState.xy_minus.delta_x = xyEst.xHat(xyEst.PX);
@@ -527,6 +535,7 @@ namespace reef_estimator
         // TODO: Humberto/Grant: Publish the integrated position as a geometry_msg/PoseStamped
         // TODO: Humberto/Grant: Publish the xyz_estimate with position and velocity here
         //Publish XY and Z states
+
         xyzState.xy_plus.x_dot = xyEst.xHat(0);
         xyzState.xy_plus.y_dot = xyEst.xHat(1);
         xyzState.xy_plus.delta_x = xyEst.xHat(xyEst.PX);
@@ -571,13 +580,17 @@ namespace reef_estimator
             //XY filter debug variables
             xyzDebugState.xy_plus.x_dot = xyEst.xHat(0);
             xyzDebugState.xy_plus.y_dot = xyEst.xHat(1);
-            xyzDebugState.xy_plus.pitch_bias = xyEst.xHat(2);
-            xyzDebugState.xy_plus.roll_bias = xyEst.xHat(3);
+            xyzDebugState.xy_plus.pitch_bias = xyEst.xHat(xyEst.BP);
+            xyzDebugState.xy_plus.roll_bias = xyEst.xHat(xyEst.BR);
             xyzDebugState.xy_plus.xa_bias = xyEst.xHat(4);
             xyzDebugState.xy_plus.ya_bias = xyEst.xHat(5);
             xyzDebugState.xy_plus.delta_x = xyEst.xHat(xyEst.PX);
             xyzDebugState.xy_plus.delta_y = xyEst.xHat(xyEst.PY);
             xyzDebugState.xy_plus.delta_yaw = xyEst.xHat(xyEst.YAW);
+            xyzDebugState.xy_plus.gx_bias = xyEst.xHat(xyEst.BGX);
+            xyzDebugState.xy_plus.gy_bias = xyEst.xHat(xyEst.BGY);
+            xyzDebugState.xy_plus.gz_bias = xyEst.xHat(xyEst.BGZ);
+
             xySigma = Eigen::MatrixXd(12, 1);
             xySigma(0) = 3 * sqrt(xyEst.P(0, 0));
             xySigma(1) = 3 * sqrt(xyEst.P(1, 1));
@@ -604,18 +617,19 @@ namespace reef_estimator
             xyzDebugState.xy_plus.sigma_plus[5] = xyzDebugState.xy_plus.ya_bias + xySigma(5);
             xyzDebugState.xy_plus.sigma_minus[5] = xyzDebugState.xy_plus.ya_bias - xySigma(5);
 
-            xyzDebugState.xy_plus.sigma_plus[6] = xyzDebugState.xy_plus.ya_bias + xySigma(6);
-            xyzDebugState.xy_plus.sigma_minus[6] = xyzDebugState.xy_plus.ya_bias - xySigma(6);
-            xyzDebugState.xy_plus.sigma_plus[7] = xyzDebugState.xy_plus.ya_bias + xySigma(7);
-            xyzDebugState.xy_plus.sigma_minus[7] = xyzDebugState.xy_plus.ya_bias - xySigma(7);
-            xyzDebugState.xy_plus.sigma_plus[8] = xyzDebugState.xy_plus.ya_bias + xySigma(8);
-            xyzDebugState.xy_plus.sigma_minus[8] = xyzDebugState.xy_plus.ya_bias - xySigma(8);
-            xyzDebugState.xy_plus.sigma_plus[9] = xyzDebugState.xy_plus.ya_bias + xySigma(9);
-            xyzDebugState.xy_plus.sigma_minus[9] = xyzDebugState.xy_plus.ya_bias - xySigma(9);
-            xyzDebugState.xy_plus.sigma_plus[10] = xyzDebugState.xy_plus.ya_bias + xySigma(10);
-            xyzDebugState.xy_plus.sigma_minus[10] = xyzDebugState.xy_plus.ya_bias - xySigma(10);
-            xyzDebugState.xy_plus.sigma_plus[11] = xyzDebugState.xy_plus.ya_bias + xySigma(11);
-            xyzDebugState.xy_plus.sigma_minus[11] = xyzDebugState.xy_plus.ya_bias - xySigma(11);
+            xyzDebugState.xy_plus.sigma_plus[6] = xyzDebugState.xy_plus.delta_x + xySigma(6);
+            xyzDebugState.xy_plus.sigma_minus[6] = xyzDebugState.xy_plus.delta_x - xySigma(6);
+            xyzDebugState.xy_plus.sigma_plus[7] = xyzDebugState.xy_plus.delta_y + xySigma(7);
+            xyzDebugState.xy_plus.sigma_minus[7] = xyzDebugState.xy_plus.delta_y - xySigma(7);
+            xyzDebugState.xy_plus.sigma_plus[8] = xyzDebugState.xy_plus.delta_yaw + xySigma(8);
+            xyzDebugState.xy_plus.sigma_minus[8] = xyzDebugState.xy_plus.delta_yaw - xySigma(8);
+            xyzDebugState.xy_plus.sigma_plus[9] = xyzDebugState.xy_plus.gx_bias + xySigma(9);
+            xyzDebugState.xy_plus.sigma_minus[9] = xyzDebugState.xy_plus.gx_bias - xySigma(9);
+            xyzDebugState.xy_plus.sigma_plus[10] = xyzDebugState.xy_plus.gy_bias + xySigma(10);
+            xyzDebugState.xy_plus.sigma_minus[10] = xyzDebugState.xy_plus.gy_bias - xySigma(10);
+            xyzDebugState.xy_plus.sigma_plus[11] = xyzDebugState.xy_plus.gz_bias + xySigma(11);
+            xyzDebugState.xy_plus.sigma_minus[11] = xyzDebugState.xy_plus.gz_bias - xySigma(11);
+
 
             //Z filter debug variables
             xyzDebugState.z_plus.z = zEst.xHat(0);

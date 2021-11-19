@@ -42,6 +42,7 @@ namespace reef_estimator
         ros::Publisher debug_state_publisher_;
         ros::Publisher is_flying_publisher_;
         ros::Publisher pose_publisher_;
+        ros::Publisher delta_measurement_publisher_;
 
         //Estimator enable/disable variables
         bool enableXY;
@@ -73,6 +74,7 @@ namespace reef_estimator
         double dt;
         bool enable_partial_update;
         int sigma_mulitplier;
+        geometry_msgs::PoseStamped delta_msg;
 
 
       //Takeoff detection variables
@@ -108,7 +110,7 @@ namespace reef_estimator
         void initializeAcc(geometry_msgs::Vector3 acc);
         bool chi2Accept(float range_measurement);
 
-        bool chi2AcceptDeltaPose(geometry_msgs::Pose pose);
+        bool chi2AcceptDeltaPose(geometry_msgs::PoseStamped pose);
         
         bool hypothesisAccept(float range_measurement);
 
@@ -123,7 +125,7 @@ namespace reef_estimator
 
         void sensorUpdate(sensor_msgs::Imu imu);
         void sensorUpdate(sensor_msgs::Range range_msg);
-        void deltaPoseUpdate(geometry_msgs::Pose pose_msg);
+        void deltaPoseUpdate(geometry_msgs::PoseStamped pose_msg);
         
 
         Eigen::MatrixXd imu_gyro;

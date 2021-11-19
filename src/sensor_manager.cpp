@@ -72,8 +72,9 @@ namespace reef_estimator
 
     void SensorManager::deltaPoseCallback(const geometry_msgs::PoseWithCovarianceStampedConstPtr &msg) {
 
-        geometry_msgs::Pose delta_pose;
-        delta_pose = msg->pose.pose;
+        geometry_msgs::PoseStamped delta_pose;
+        delta_pose.pose = msg->pose.pose;
+        delta_pose.header = msg->header;
         xyzEst.deltaPoseUpdate(delta_pose);
     }
 

@@ -59,6 +59,7 @@ namespace reef_estimator
         ROS_WARN_STREAM("[REEF EST]:: Body to camera \n" << body_to_camera.matrix());
         //Initialize the keyframe
         C_body_to_camera = body_to_camera.linear().transpose();
+        p_body_to_camera = body_to_camera.translation();
 
         ROS_WARN_STREAM("[C]:: Body to camera \n" << C_body_to_camera);
         relativeReset_publisher_ = nh_.advertise<geometry_msgs::PoseStamped>("deltaState", 1, true);
@@ -86,14 +87,14 @@ namespace reef_estimator
         roll_est = roll - roll_bias;
         //Pitch and roll
                 C_body_level_to_body_frame << cos(pitch_est), 0, -sin(pitch_est),
-                sin(roll_est) * sin(pitch_est), cos(roll_est), sin(roll_est) * cos(pitch_est),
-                cos(roll_est) * sin(pitch_est), -sin(roll_est), cos(roll_est) * cos(pitch_est);
+                                              sin(roll_est) * sin(pitch_est), cos(roll_est), sin(roll_est) * cos(pitch_est),
+                                              cos(roll_est) * sin(pitch_est), -sin(roll_est), cos(roll_est) * cos(pitch_est);
 
-        Eigen::Matrix3d C3;
-        C3<< cos(xHat(YAW)), sin(xHat(YAW)), 0,
-             -sin(xHat(YAW)), cos(xHat(YAW)), 0,
-             0,                           0    ,       1;
-//        C_body_level_to_body_frame= C_body_level_to_body_frame*C3;
+        Eigen::Matrix2d C3_Yaw_2x2;
+        C3_Yaw_2x2<< cos(xHat(YAW)), sin(xHat(YAW)),
+             -sin(xHat(YAW)), cos(xHat(YAW));
+//        C_body_level_to_body_frame= C_body_level_to_body_frame*C3_Yaw_2x2
+//      2;
 
         Eigen::MatrixXd C_body_level_to_body_frame_2x2(2, 2);
         C_body_level_to_body_frame_2x2 = C_body_level_to_body_frame.block<2, 2>(0, 0);
@@ -105,35 +106,38 @@ namespace reef_estimator
 
         bias_z_in_NED << 0, 0, bias_z_in_NED_component;
 
-        bias_z_in_body_frame = C_NED_to_body_frame * bias_z_in_NED;
+        bias_z_in_body_frame = C_body_level_to_body_frame * bias_z_in_NED;
+//        bias_z_in_body_frame = C_NED_to_body_frame * bias_z_in_NED;
         biasAccel_in_body_frame << xHat(4), xHat(5), bias_z_in_body_frame(2);
 
         Eigen::Vector3d gravity_in_NED;
         gravity_in_NED << 0, 0, initialAccMagnitude;
 
         Eigen::Vector3d gravity_in_body_frame;
-        gravity_in_body_frame = C_NED_to_body_frame * gravity_in_NED;
+        gravity_in_body_frame =  gravity_in_NED;
+//        gravity_in_body_frame = C_NED_to_body_frame * gravity_in_NED;
 
         Eigen::Vector3d input_to_system_in_body_frame;
-        input_to_system_in_body_frame = accelxyz_in_body_frame + gravity_in_body_frame + biasAccel_in_body_frame;
+        input_to_system_in_body_frame = accelxyz_in_body_frame +  biasAccel_in_body_frame ;
 
         // head(n) means take n elements from the vector starting from index 0. head(2) takes element 0 and 1 from the vector.
         /*
          * C_NED_to_body_frame*gravity_in_NED is included in the nonLinearDynamics to remove the gravity reading.
          *
          */
-        nonLinearDynamics = C_body_level_to_body_frame.transpose() * (input_to_system_in_body_frame);
+        nonLinearDynamics = C_body_level_to_body_frame.transpose() * (input_to_system_in_body_frame) + gravity_in_body_frame ;
         Eigen::Vector3d xy_time_update;
         xy_time_update = nonLinearDynamics * dt;
 
         Eigen::Vector3d gyro_in_body_level_frame;
-//        gyro_in_body_level_frame = C_body_level_to_body_frame.transpose() *( gyroxyz_in_body_frame + xHat.block<3,1>(BGX,0));
+        gyro_in_body_level_frame = C_body_level_to_body_frame.transpose() *( gyroxyz_in_body_frame + xHat.block<3,1>(BGX,0));
 
         Eigen::Matrix3d A;//Attitude influence matrix 321ypr (only third row). Kinematic singularity at pitch_est = 90deg
         A << 0,0,0,
              0,0,0,
              0, sin(roll_est)/cos(pitch_est),cos(roll_est)/cos(pitch_est);
-        gyro_in_body_level_frame = A*( gyroxyz_in_body_frame + xHat.block<3,1>(BGX,0));
+//        gyro_in_body_level_frame = A*( gyroxyz_in_body_frame + xHat.block<3,1>(BGX,0));
+
 
         xHat << xHat(0) + xy_time_update(0),
                 xHat(1) + xy_time_update(1),
@@ -177,13 +181,21 @@ namespace reef_estimator
         pe = pitch_est;
         re = roll_est;
 
-        Eigen::MatrixXd partialC_partialBiasAttitude = Eigen::MatrixXd(2,2);
-        partialC_partialBiasAttitude << sin(pe) * xc - sin(re) * cos(pe) * yc - cos(re) * cos(pe) * zc, -cos(re) * sin(pe) * yc + sin(re) * sin(pe) * zc,
-                                         0.0, sin(re) * yc + cos(re) * zc;
+        Eigen::MatrixXd partialV_partialBiasAttitude = Eigen::MatrixXd(2, 2);
+        partialV_partialBiasAttitude << - yc * sin(pe) * cos(re) + zc * sin(re) * sin(pe), xc * sin(pe) - yc * sin(re) * cos(pe) - zc * cos(re) * cos(pe),
+                                         yc*sin(re) + zc* cos(re),                                       0.0;
+
+//        partialC_partialBiasAttitude << sin(pe) * xc - sin(re) * cos(pe) * yc - cos(re) * cos(pe) * zc, -cos(re) * sin(pe) * yc + sin(re) * sin(pe) * zc,
+//                                         0.0,                                                            sin(re) * yc + cos(re) * zc;
+        Eigen::MatrixXd PartialVel_PartialBiasAccel = Eigen::MatrixXd(2, 2);
+        PartialVel_PartialBiasAccel = C_body_level_to_body_frame_2x2.transpose();
 
         Eigen::MatrixXd PartialYawPartialBiasAttitude = Eigen::MatrixXd(1,2);
         PartialYawPartialBiasAttitude << -cos(pe)*cos(re)*(gyroxyz_in_body_frame(1) + xHat(BGY)) + sin(re)*cos(pe)*(gyroxyz_in_body_frame(2) +xHat(BGZ)),
-        cos(pe)*(gyroxyz_in_body_frame(0) + xHat(BGX)) + sin(re)*sin(pe)*(gyroxyz_in_body_frame(1) +xHat(BGY)) + cos(re)*sin(pe)*(gyroxyz_in_body_frame(2) + xHat(BGZ));
+                                        cos(re)*(gyroxyz_in_body_frame(0) + xHat(BGX)) + sin(re)*sin(pe)*(gyroxyz_in_body_frame(1) +xHat(BGY)) + cos(re)*sin(pe)*(gyroxyz_in_body_frame(2) + xHat(BGZ));
+
+
+
 
         Eigen::MatrixXd PartialYawPartialGyroBias = Eigen::MatrixXd(1,3);
         PartialYawPartialGyroBias << -sin(pe), sin(re)*cos(pe), cos(re)*cos(pe);
@@ -192,26 +204,25 @@ namespace reef_estimator
         PartialYaw << -xHat(0) * sin(xHat(8)) - xHat(1) * cos(xHat(8)),
                 xHat(0) * cos(xHat(8)) - xHat(1) * sin(xHat(8));
 
-        Eigen::MatrixXd PartialVel = Eigen::MatrixXd(2, 2);
-        PartialVel << cos(xHat(8)), -sin(xHat(8)),
-                      sin(xHat(8)), cos(xHat(8));
+        Eigen::MatrixXd PartialPos_PartialVel = Eigen::MatrixXd(2, 2);
+        PartialPos_PartialVel =  C3_Yaw_2x2.transpose();
+        Eigen::MatrixXd PartialYaw_PartialNoiseGyro = Eigen::MatrixXd(1, 3);
+        PartialYaw_PartialNoiseGyro<< -sin(pe), sin(re)*cos(pe), cos(re)*cos(pe);
 
-
-        F << zeros2x2, partialC_partialBiasAttitude, C_body_level_to_body_frame_2x2.transpose(), zeros2x2, zeros2x1,zeros2x3, //velocity
+        F << zeros2x2, partialV_partialBiasAttitude, PartialVel_PartialBiasAccel, zeros2x2, zeros2x1,zeros2x3, //velocity
                 zeros2x2, zeros2x2, zeros2x2, zeros2x2, zeros2x1, zeros2x3, //attitude bias
                 zeros2x2, zeros2x2, zeros2x2, zeros2x2, zeros2x1, zeros2x3,//accel bias
-                PartialVel, zeros2x2, zeros2x2, zeros2x2, PartialYaw, zeros2x3,//position xy
-                zeros1x2, PartialYawPartialBiasAttitude, zeros1x2, zeros1x2, zeros1x1, PartialYawPartialGyroBias,//yaw
-                zeros3x12;
+                PartialPos_PartialVel, zeros2x2, zeros2x2, zeros2x2, PartialYaw, zeros2x3,//position xy
+                zeros1x2, PartialYawPartialBiasAttitude, zeros1x2, zeros1x2, zeros1x1, PartialYawPartialGyroBias,//Yaw
+                zeros3x12;//Gyro bias
 
 
-        G << C_body_level_to_body_frame_2x2.transpose(), zeros2x2, zeros2x2, zeros2x3, zeros2x3,
+        G << PartialVel_PartialBiasAccel, zeros2x2, zeros2x2, zeros2x3, zeros2x3,
                 zeros2x2, Id.setIdentity(2, 2), zeros2x2, zeros2x3, zeros2x3,
                 zeros2x2, zeros2x2, Id.setIdentity(2, 2), zeros2x3, zeros2x3,
                 zeros2x2, zeros2x2, zeros2x2, zeros2x3, zeros2x3,
-                zeros1x2, zeros1x2, zeros1x2, -sin(pe), sin(re)*cos(pe), cos(re)*cos(pe), zeros1x3,
+                zeros1x2, zeros1x2, zeros1x2, PartialYaw_PartialNoiseGyro, zeros1x3,
                 zeros3x2, zeros3x2, zeros3x2, zeros3x3, Eigen::MatrixXd::Identity(3,3) ;
-
 
 
         P = P + (F * P.transpose() + P * F.transpose() + G * Q * G.transpose()) * dt;
@@ -266,11 +277,6 @@ namespace reef_estimator
         std_msgs::Empty empty;
         keyframe_now.publish(empty);
 
-//        Eigen::Affine3d current_delta;
-//        current_delta.translation() = Eigen::Vector3d(xHat(PX), xHat(PY),0);
-//        current_delta.linear() = reef_msgs::DCM_from_Euler321(Eigen::Vector3d(0,0,xHat(YAW))).transpose();
-//This line integrates the total delta from the one keyframe to the next.
-        //global_pose = global_pose*current_delta;
         Eigen::Affine3d keyframe_delta;
         keyframe_delta.translation() = Eigen::Vector3d(xHat(PX), xHat(PY),0);
         keyframe_delta.linear() = reef_msgs::fromEulerAngleToRotationMatrix<Eigen::Matrix<double,3,1>, Eigen::Matrix<double,3,3>>(Eigen::Matrix<double,3,1>(
@@ -296,21 +302,27 @@ namespace reef_estimator
         Delta.pose.position.x = global_pose_p.translation().x();
         Delta.pose.position.y = global_pose_p.translation().y();
 //        Delta.pose.position.z = xHat(YAW);
-
         relativeReset_publisher_.publish(Delta);
 
         xHat(PX) = 0.;
         xHat(PY) = 0.;
         xHat(YAW) = 0.;
-
-        //Reset crosscovariances to zero
-        P.block<6,6>(PX,VX) = Eigen::MatrixXd::Zero(6,6) ;
-        P.block<6,6>(VX,PX) = Eigen::MatrixXd::Zero(6,6);
-        P.block<3,3>(PX,BAX) = Eigen::MatrixXd::Zero(3,3);
-        P.block<3,3>(BAX,PX) = Eigen::MatrixXd::Zero(3,3);
-        //Reset xy and psi covariances to initial values
-        P.block<6,6>(PX,PX) = P0.block<6,6>(PX,PX);
-
+        Eigen::MatrixXd M = Eigen::MatrixXd (12,12);
+        M.setZero();
+        M(VX,VX) = 1.0;
+        M(VY,VY) = 1.0;
+        M(BR,BR) = 1.0;
+        M(BP,BP) = 1.0;
+        M(BAX,BAX) = 1.0;
+        M(BAY,BAY) = 1.0;
+        M(PX,PX) = 0.0;
+        M(PY,PY) = 0.0;
+        M(YAW,YAW) = 0.0;
+        M(BGX,BGX) = 1.0;
+        M(BGY,BGY) = 1.0;
+        M(BGZ,BGZ) = 1.0;
+        P = M*P*M;
+        P.block<3,3>(PX,PX) = P0.block<3,3>(PX,PX);
         resetCount++;
     }
 

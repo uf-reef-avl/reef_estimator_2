@@ -7,7 +7,7 @@
     <rosparam command="load" file="$(find reef_estimator)/params/$(arg vehicle)_camera.yaml" />
 
     <group if="$(arg play_bag)">
-        <arg name="bag_path" default="/home/prashant/Downloads/reef_2.bag"/>
+        <arg name="bag_path" default="/home/humberto/Downloads/reef_2.bag"/>
         <node pkg="rosbag" type="play" name="player" output="screen" args="--clock --pause --quiet $(arg bag_path)">
             <remap from="/et/ned/pose_stamped" to="/pose_stamped"/>
         </node>
@@ -22,6 +22,7 @@
             enable_sonar: false
             enable_mocap_xy: true
             enable_mocap_z: true
+
         </rosparam>
         <remap from="mocap_ned" to="pose_stamped"/>
     </node>
