@@ -255,17 +255,28 @@ namespace reef_estimator
             else{
                 xyEst.update();
             }
+
+
             newDeltaMeasurement = false;
         }
 
         if (enableZ && newSonarMeasurement) {
             //TODO adjust estimator to perform partialUpdate on z as well.
-            if(enable_partial_update)
+            if(enable_partial_update) {
                 zEst.partialUpdate();
-            else
+            }
+            else {
                 zEst.update();
+            }
             newSonarMeasurement = false;
         }
+
+
+
+
+
+        //
+        integrateGlobalPose();
 
         publishEstimates();
 
@@ -548,12 +559,7 @@ namespace reef_estimator
         state_publisher_.publish(xyzState);
 
         xyEst.Delta.header = xyzState.header;
-//        xyzPose.pose.position.x = xyEst.global_x;
-//        xyzPose.pose.position.y = xyEst.global_y;
-//        xyzPose.pose.position.z = 57.3*xyEst.global_yaw;
-//        xyzPose.header = xyzState.header;
-//
-//        reef_msgs::quaternion_from_roll_pitch_yaw(xyEst.roll_est, xyEst.pitch_est, xyEst.global_yaw, xyzPose.pose.orientation);
+
 
         Eigen::Affine3d delta_pose_wrt_keyframe_in_BL_frame;
         Eigen::Affine3d body_level_to_body_frame;
@@ -658,5 +664,10 @@ namespace reef_estimator
         return sqrt(x * x + y * y + z * z);
     }
 
+    void XYZEstimator::integrateGlobalPose(){
+//        xyEst.pose_gain_from_propagation.
+
+
+    }
 
 }

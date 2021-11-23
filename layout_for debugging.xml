@@ -1,0 +1,77 @@
+<?xml version='1.0' encoding='UTF-8'?>
+<root version="2.3.8">
+ <tabbed_widget name="Main Window" parent="main_window">
+  <Tab containers="1" tab_name="tab1">
+   <Container>
+    <DockSplitter sizes="0.333694;0.332611;0.333694" count="3" orientation="-">
+     <DockArea name="...">
+      <plot mode="TimeSeries" style="Lines">
+       <range right="51.503292" bottom="-0.314529" left="50.926927" top="0.318757"/>
+       <limitY/>
+       <curve name="/xyz_debug_estimate/xy_plus/delta_x" color="#001bff"/>
+       <curve name="/true_state/xy_plus/delta_x" color="#000000"/>
+       <curve name="/xyz_debug_estimate/xy_plus/sigma_minus.6" color="#ff001f"/>
+       <curve name="/xyz_debug_estimate/xy_plus/sigma_plus.6" color="#ff0027"/>
+      </plot>
+     </DockArea>
+     <DockArea name="...">
+      <plot mode="TimeSeries" style="Lines">
+       <range right="51.503292" bottom="0.154815" left="50.926927" top="0.263924"/>
+       <limitY/>
+       <curve name="/xyz_debug_estimate/xy_plus/delta_y" color="#0020ff"/>
+       <curve name="/true_state/xy_plus/delta_y" color="#000000"/>
+       <curve name="/xyz_debug_estimate/xy_plus/sigma_minus.7" color="#ff0027"/>
+       <curve name="/xyz_debug_estimate/xy_plus/sigma_plus.7" color="#ff0e4c"/>
+      </plot>
+     </DockArea>
+     <DockArea name="...">
+      <plot mode="TimeSeries" style="Lines">
+       <range right="51.503292" bottom="-0.275449" left="50.926927" top="0.279677"/>
+       <limitY/>
+       <curve name="/xyz_debug_estimate/xy_plus/delta_yaw" color="#0002ff"/>
+       <curve name="/true_state/xy_plus/delta_yaw" color="#000000"/>
+       <curve name="/xyz_debug_estimate/xy_plus/sigma_minus.8" color="#ff0001"/>
+       <curve name="/xyz_debug_estimate/xy_plus/sigma_plus.8" color="#ff0300"/>
+      </plot>
+     </DockArea>
+    </DockSplitter>
+   </Container>
+  </Tab>
+  <currentTabIndex index="0"/>
+ </tabbed_widget>
+ <use_relative_time_offset enabled="1"/>
+ <!-- - - - - - - - - - - - - - - -->
+ <!-- - - - - - - - - - - - - - - -->
+ <Plugins>
+  <plugin ID="DataLoad CSV">
+   <default time_axis=""/>
+  </plugin>
+  <plugin ID="DataLoad ROS bags">
+   <use_header_stamp value="false"/>
+   <use_renaming_rules value="true"/>
+   <discard_large_arrays value="true"/>
+   <max_array_size value="100"/>
+  </plugin>
+  <plugin ID="DataLoad ULog"/>
+  <plugin ID="LSL Subscriber"/>
+  <plugin ID="MQTT Subscriber"/>
+  <plugin ID="ROS Topic Subscriber">
+   <use_header_stamp value="false"/>
+   <use_renaming_rules value="true"/>
+   <discard_large_arrays value="true"/>
+   <max_array_size value="100"/>
+  </plugin>
+  <plugin ID="UDP Server"/>
+  <plugin ID="WebSocket Server"/>
+  <plugin ID="ZMQ Subscriber"/>
+  <plugin ID="ROS /rosout Visualization" status="idle"/>
+  <plugin ID="ROS Topic Re-Publisher" status="idle"/>
+ </Plugins>
+ <!-- - - - - - - - - - - - - - - -->
+ <previouslyLoaded_Datafiles/>
+ <!-- - - - - - - - - - - - - - - -->
+ <customMathEquations/>
+ <snippets/>
+ <!-- - - - - - - - - - - - - - - -->
+</root>
+

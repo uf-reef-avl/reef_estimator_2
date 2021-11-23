@@ -236,15 +236,12 @@ namespace reef_estimator
         propagated_state.z() = xHat(YAW);
 
         //Now we compute the gain in pose.
+        ///////////////////////////////////////////
+        ////////////////////////////////////////////////////////////////////////////
         Eigen::Vector3d difference_in_pose;
         difference_in_pose = propagated_state - prior_state;
-        Eigen::Affine3d pose_gain;
-        pose_gain.linear() = reef_msgs::DCM_from_Euler321(Eigen::Vector3d (0,0,difference_in_pose.z())).transpose();
-        pose_gain.translation() << difference_in_pose.x(),difference_in_pose.y(), 0.0; //We do not do altitude deltas. That is in the Z filter.
-
-        global_pose = global_pose*pose_gain;
-        global_x = global_pose.translation().x();
-        global_y = global_pose.translation().y();
+        pose_gain_from_propagation.linear() = reef_msgs::DCM_from_Euler321(Eigen::Vector3d (0,0,difference_in_pose.z())).transpose();
+        pose_gain_from_propagation.translation() << difference_in_pose.x(),difference_in_pose.y(), 0.0; //We do not do altitude deltas. That is in the Z filter.
         reef_msgs::get_yaw(global_pose.linear().transpose(), global_yaw);
         if(global_yaw<-2.0*M_PI){
             global_yaw += 2.0*M_PI;
@@ -252,7 +249,8 @@ namespace reef_estimator
         else if(global_yaw>2.0*M_PI){
             global_yaw -= 2.0*M_PI;
         }
-
+        /////////////////////////////////////////////////////////////////////////////
+        ////////////////////////////////////////////////////////////////////////////
         distance = sqrt(pow(xHat(6), 2) + pow(xHat(7), 2));
         if ((XYTakeoff && (distance > dPoseLimit)) || (XYTakeoff && (xHat(8) > dYawLimit))) {
             //Save attitude at the time of keyframe

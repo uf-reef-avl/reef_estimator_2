@@ -42,6 +42,9 @@ namespace reef_estimator
         Eigen::Affine3d global_pose_p;
         Eigen::Affine3d keyframe_in_body_frame;
 
+        Eigen::Affine3d pose_gain_from_propagation;
+
+
         // orientation variables 
         double pitch;
         double roll;

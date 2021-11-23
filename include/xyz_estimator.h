@@ -113,8 +113,10 @@ namespace reef_estimator
         bool chi2AcceptDeltaPose(geometry_msgs::PoseStamped pose);
         
         bool hypothesisAccept(float range_measurement);
+        void integrateGlobalPose();
 
-    public:
+
+            public:
         XYZEstimator();
         ~XYZEstimator();
 
