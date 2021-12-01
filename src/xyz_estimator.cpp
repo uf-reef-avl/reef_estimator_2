@@ -91,10 +91,15 @@ namespace reef_estimator
         if (pose_msg != NULL) {
             ROS_INFO_STREAM("GOT MY FIRST MOCAP MESSAGE");
         }
-        reef_msgs::roll_pitch_yaw_from_quaternion(pose_msg->pose.orientation,roll_init, pitch_init, yaw_init);
+        //Eigen::Matrix<double,3,1>  euler = reef_msgs::fromQuaternionToEulerAngle<geometry_msgs::Quaternion, Eigen::Matrix<double,3,1>>(pose_msg->pose.orientation);
+        //Save the initial level keyframe
+        //global_yaw  = euler(0,0);
+
+	reef_msgs::roll_pitch_yaw_from_quaternion(pose_msg->pose.orientation,roll_init, pitch_init, yaw_init);
         //Save the initial level keyframe
         global_yaw  = yaw_init;
-        global_pose.linear() = reef_msgs::DCM_from_Euler321(Eigen::Vector3d (0,0,yaw_init)).transpose();
+        
+	global_pose.linear() = reef_msgs::DCM_from_Euler321(Eigen::Vector3d (0,0,global_yaw)).transpose(); //TODO: Verify this line
         global_pose.translation() = Eigen::Vector3d (pose_msg->pose.position.x,pose_msg->pose.position.y,0.0);
         xyEst.XYTakeoff = false;
         //Initialize the keyframe
@@ -274,7 +279,7 @@ namespace reef_estimator
 
         publishEstimates();
 
-        if ((xyEst.XYTakeoff && (xyEst.distance > xyEst.dPoseLimit)) || (xyEst.XYTakeoff && (xyEst.xHat(xyEst.YAW) > xyEst.dYawLimit))) {
+        if (((xyEst.distance > xyEst.dPoseLimit)) || (abs(xyEst.xHat(xyEst.YAW)) > xyEst.dYawLimit)) {
 
             //Save states at the time of keyframe
             C_level_keyframe_to_body_keyframe_at_k = xyEst.C_body_level_to_body_frame;
