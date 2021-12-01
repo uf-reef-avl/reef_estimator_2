@@ -28,19 +28,20 @@ namespace reef_estimator
         Eigen::Matrix3d C_body_to_body_fixed_frame;
         void nonlinearPropagation(Eigen::Matrix3d &C,double initialAcc, Eigen::Vector3d accel_in_body, Eigen::Vector3d gyro_in_body, float bias_z_in_NED_component);
         void resetLandingState();
-        void relativeReset(Eigen::MatrixXd &xHat, Eigen::MatrixXd &P);
+        void relativeReset();
 
         Eigen::Matrix3d C_body_level_to_body_frame ;
-        Eigen::Matrix3d C_level_keyframe_to_body_keyframe_at_k;
         Eigen::Affine3d body_to_camera;
         Eigen::Vector3d p_body_to_camera;
         Eigen::Matrix3d C_body_to_camera;
 
         Eigen::Vector3d nonLinearDynamics;
         Eigen::Matrix2d Id;
-        Eigen::Affine3d global_pose;
         Eigen::Affine3d global_pose_p;
         Eigen::Affine3d keyframe_in_body_frame;
+
+        Eigen::Affine3d pose_gain_from_propagation;
+
 
         // orientation variables 
         double pitch;

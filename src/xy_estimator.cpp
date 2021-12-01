@@ -71,12 +71,7 @@ namespace reef_estimator
     XYEstimator::~XYEstimator(){}
 
     void XYEstimator::nonlinearPropagation(Eigen::Matrix3d &C_NED_to_body_frame, double initialAccMagnitude,Eigen::Vector3d accelxyz_in_body_frame, Eigen::Vector3d gyroxyz_in_body_frame, float bias_z_in_NED_component) {
-        //////Save state before propagating.//////
-        Eigen::Vector3d prior_state;
-        prior_state.x() = xHat(PX,0);
-        prior_state.y() = xHat(PY,0);
-        prior_state.z() = xHat(YAW);
-        //////////////////////////////////////////
+
         reef_msgs::roll_pitch_yaw_from_rotation321(C_NED_to_body_frame, roll, pitch, yaw);
 
         roll_bias = xHat(BR);
@@ -228,37 +223,10 @@ namespace reef_estimator
         P = P + (F * P.transpose() + P * F.transpose() + G * Q * G.transpose()) * dt;
 //        P = F*P*F.transpose() + G*Q*G.transpose();
 
-        //Accumulate the small delta poses
 
-        Eigen::Vector3d propagated_state;
-        propagated_state.x() = xHat(PX,0);
-        propagated_state.y() = xHat(PY,0);
-        propagated_state.z() = xHat(YAW);
 
-        //Now we compute the gain in pose.
-        Eigen::Vector3d difference_in_pose;
-        difference_in_pose = propagated_state - prior_state;
-        Eigen::Affine3d pose_gain;
-        pose_gain.linear() = reef_msgs::DCM_from_Euler321(Eigen::Vector3d (0,0,difference_in_pose.z())).transpose();
-        pose_gain.translation() << difference_in_pose.x(),difference_in_pose.y(), 0.0; //We do not do altitude deltas. That is in the Z filter.
+        distance = sqrt(pow(xHat(PX), 2) + pow(xHat(PY), 2));
 
-        global_pose = global_pose*pose_gain;
-        global_x = global_pose.translation().x();
-        global_y = global_pose.translation().y();
-        reef_msgs::get_yaw(global_pose.linear().transpose(), global_yaw);
-        if(global_yaw<-2.0*M_PI){
-            global_yaw += 2.0*M_PI;
-        }
-        else if(global_yaw>2.0*M_PI){
-            global_yaw -= 2.0*M_PI;
-        }
-
-        distance = sqrt(pow(xHat(6), 2) + pow(xHat(7), 2));
-        if ((XYTakeoff && (distance > dPoseLimit)) || (XYTakeoff && (xHat(8) > dYawLimit))) {
-            //Save attitude at the time of keyframe
-            XYEstimator::relativeReset(xHat, P);
-            C_level_keyframe_to_body_keyframe_at_k = C_body_level_to_body_frame;
-        }
 
     }
 
@@ -272,38 +240,18 @@ namespace reef_estimator
     }
 
 
-    void XYEstimator::relativeReset(Eigen::MatrixXd &xHat, Eigen::MatrixXd &P){
+    void XYEstimator::relativeReset(){
         ROS_WARN_STREAM("STATE RESET");
+        //Tell the odometry node to keyframe via an empty message.
         std_msgs::Empty empty;
         keyframe_now.publish(empty);
-
-        Eigen::Affine3d keyframe_delta;
-        keyframe_delta.translation() = Eigen::Vector3d(xHat(PX), xHat(PY),0);
-        keyframe_delta.linear() = reef_msgs::fromEulerAngleToRotationMatrix<Eigen::Matrix<double,3,1>, Eigen::Matrix<double,3,3>>(Eigen::Matrix<double,3,1>(
-                0, 0, xHat(YAW)));
-
-        Eigen::Affine3d body_level_to_body_frame;
-        body_level_to_body_frame.linear() = C_body_level_to_body_frame.transpose();
-        body_level_to_body_frame.translation() = Eigen::Vector3d::Zero();
-
-        Eigen::Affine3d body_level_to_body_frame_at_keyframe_time;
-        body_level_to_body_frame_at_keyframe_time.linear() = C_level_keyframe_to_body_keyframe_at_k.transpose();
-        body_level_to_body_frame_at_keyframe_time.translation() = Eigen::Vector3d::Zero();
-
-        keyframe_in_body_frame = body_level_to_body_frame_at_keyframe_time.inverse() * keyframe_delta * body_level_to_body_frame;
-        Eigen::Affine3d temp;
-        temp = global_pose_p * keyframe_in_body_frame;
-        global_pose_p = temp;
-
-        // Publish current position and heading to topic to be read from backend compiler here (reset to zero after)
-//        Delta.pose.position.x = xHat(PX);
-//        Delta.pose.position.y = xHat(PY);
-//        Delta.pose.position.z = xHat(YAW);
+        //Publish the acummulated delta
         Delta.pose.position.x = global_pose_p.translation().x();
         Delta.pose.position.y = global_pose_p.translation().y();
 //        Delta.pose.position.z = xHat(YAW);
         relativeReset_publisher_.publish(Delta);
 
+        //Reset the states and covariances to zero and initial values, respectively.
         xHat(PX) = 0.;
         xHat(PY) = 0.;
         xHat(YAW) = 0.;

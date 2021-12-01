@@ -75,7 +75,7 @@ namespace reef_estimator
         reef_msgs::importMatrixFromParamServer(private_nh_, xyEst.Q, "xy_Q");
         reef_msgs::importMatrixFromParamServer(private_nh_, xyEst.R0, "xy_R0");
         reef_msgs::importMatrixFromParamServer(private_nh_, xyEst.betaVector, "xy_beta");
-//        xyEst.Q *= (xyEst.dt*xyEst.dt);
+//        xyEst.Q *= (xyEst.dt);
 
         //Get the constraint to implement relative reset from yaml file
         private_nh_.param<double>("delta_pose_limit", xyEst.dPoseLimit, 0.5);
@@ -84,28 +84,26 @@ namespace reef_estimator
 
 
         //Initialization of the first frame with MOCAP
-        double roll_init, pitch_init, yaw_init;
         std::string mocapPoseTopic;
         nh_.param<std::string>("mocap_pose_topic", mocapPoseTopic, "mocap_ned");
         geometry_msgs::PoseStampedConstPtr pose_msg;
         pose_msg = ros::topic::waitForMessage<geometry_msgs::PoseStamped>("/pose_stamped", nh_);
         if (pose_msg != NULL) {
             ROS_INFO_STREAM("GOT MY FIRST MOCAP MESSAGE");
-            reef_msgs::roll_pitch_yaw_from_quaternion(pose_msg->pose.orientation,roll_init, pitch_init, yaw_init);
-
-            xyEst.xHat0(xyEst.YAW) = 0;
         }
-        xyEst.global_pose.linear() = reef_msgs::DCM_from_Euler321(Eigen::Vector3d (0,0,yaw_init)).transpose();
-        xyEst.global_pose.translation() = Eigen::Vector3d (pose_msg->pose.position.x,pose_msg->pose.position.y,0.0);
+        reef_msgs::roll_pitch_yaw_from_quaternion(pose_msg->pose.orientation,roll_init, pitch_init, yaw_init);
+        //Save the initial level keyframe
+        global_yaw  = yaw_init;
+        global_pose.linear() = reef_msgs::DCM_from_Euler321(Eigen::Vector3d (0,0,yaw_init)).transpose();
+        global_pose.translation() = Eigen::Vector3d (pose_msg->pose.position.x,pose_msg->pose.position.y,0.0);
         xyEst.XYTakeoff = false;
         //Initialize the keyframe
-        xyEst.C_level_keyframe_to_body_keyframe_at_k = reef_msgs::DCM_from_Euler321(Eigen::Vector3d(roll_init, pitch_init, 0));
-        tf2::fromMsg(pose_msg->pose, xyEst.global_pose_p);
+        C_level_keyframe_to_body_keyframe_at_k = reef_msgs::DCM_from_Euler321(Eigen::Vector3d(roll_init, pitch_init, 0));
+        tf2::fromMsg(pose_msg->pose, xyEst.global_pose_p); //To Affine3d
 
         xyEst.initialize();//Initialize P,R and beta.
         ROS_WARN_STREAM("Filter initialized with:\t"<<xyEst.xHat);
 
-        //Save the initial covariances for relative states XY and yaw
         reef_msgs::importMatrixFromParamServer(private_nh_, zEst.xHat0, "z_x0");
         reef_msgs::importMatrixFromParamServer(private_nh_, zEst.P0, "z_P0");
         reef_msgs::importMatrixFromParamServer(private_nh_, zEst.P0forFlying, "z_P0_flying");
@@ -255,19 +253,36 @@ namespace reef_estimator
             else{
                 xyEst.update();
             }
+
+
             newDeltaMeasurement = false;
         }
 
         if (enableZ && newSonarMeasurement) {
             //TODO adjust estimator to perform partialUpdate on z as well.
-            if(enable_partial_update)
+            if(enable_partial_update) {
                 zEst.partialUpdate();
-            else
+            }
+            else {
                 zEst.update();
+            }
             newSonarMeasurement = false;
         }
 
+
+        integrateGlobalPose();
+
         publishEstimates();
+
+        if ((xyEst.XYTakeoff && (xyEst.distance > xyEst.dPoseLimit)) || (xyEst.XYTakeoff && (xyEst.xHat(xyEst.YAW) > xyEst.dYawLimit))) {
+
+            //Save states at the time of keyframe
+            C_level_keyframe_to_body_keyframe_at_k = xyEst.C_body_level_to_body_frame;
+            global_pose.translation() = global_pose.translation() + C3_Yaw.transpose()*current_deltaXY;
+            global_yaw = global_yaw + xyEst.xHat(xyEst.YAW);
+            //Perform reset
+            xyEst.relativeReset();
+        }
 
         checkTakeoffState(accelxyz_in_body_frame.norm());
     }
@@ -298,10 +313,10 @@ namespace reef_estimator
         delta_p_camera_frame << pose_msg.pose.position.x, pose_msg.pose.position.y, pose_msg.pose.position.z;
         Eigen::Vector3d delta_p_body_level_k_to_body_level_kplus1;
 //        ROS_WARN_STREAM("BODY TO CAM P"<<xyEst.p_body_to_camera);
-        delta_p_body_level_k_to_body_level_kplus1 << xyEst.C_level_keyframe_to_body_keyframe_at_k.transpose() *( xyEst.p_body_to_camera + xyEst.C_body_to_camera.transpose() * ( delta_p_camera_frame + delta_C.transpose()*xyEst.C_body_to_camera*(-xyEst.p_body_to_camera)) );
+        delta_p_body_level_k_to_body_level_kplus1 << C_level_keyframe_to_body_keyframe_at_k.transpose() *( xyEst.p_body_to_camera + xyEst.C_body_to_camera.transpose() * ( delta_p_camera_frame + delta_C.transpose()*xyEst.C_body_to_camera*(-xyEst.p_body_to_camera)) );
 
         Eigen::Matrix3d delta_C_level_k_to_level_kplus1;
-        delta_C_level_k_to_level_kplus1 = xyEst.C_body_level_to_body_frame.transpose() * xyEst.C_body_to_camera.transpose() * delta_C * xyEst.C_body_to_camera * xyEst.C_level_keyframe_to_body_keyframe_at_k;
+        delta_C_level_k_to_level_kplus1 = xyEst.C_body_level_to_body_frame.transpose() * xyEst.C_body_to_camera.transpose() * delta_C * xyEst.C_body_to_camera * C_level_keyframe_to_body_keyframe_at_k;
         double delta_yaw;
         reef_msgs::get_yaw(delta_C_level_k_to_level_kplus1, delta_yaw);
 
@@ -548,31 +563,6 @@ namespace reef_estimator
         state_publisher_.publish(xyzState);
 
         xyEst.Delta.header = xyzState.header;
-//        xyzPose.pose.position.x = xyEst.global_x;
-//        xyzPose.pose.position.y = xyEst.global_y;
-//        xyzPose.pose.position.z = 57.3*xyEst.global_yaw;
-//        xyzPose.header = xyzState.header;
-//
-//        reef_msgs::quaternion_from_roll_pitch_yaw(xyEst.roll_est, xyEst.pitch_est, xyEst.global_yaw, xyzPose.pose.orientation);
-
-        Eigen::Affine3d delta_pose_wrt_keyframe_in_BL_frame;
-        Eigen::Affine3d body_level_to_body_frame;
-        body_level_to_body_frame.linear() = xyEst.C_body_level_to_body_frame.transpose();
-        body_level_to_body_frame.translation() = Eigen::Vector3d::Zero();
-        delta_pose_wrt_keyframe_in_BL_frame.translation() = Eigen::Vector3d(xyEst.xHat(xyEst.PX), xyEst.xHat(xyEst.PY), 0 );
-        delta_pose_wrt_keyframe_in_BL_frame.linear() = reef_msgs::fromEulerAngleToRotationMatrix<Eigen::Matrix<double,3,1>, Eigen::Matrix<double,3,3>>(Eigen::Matrix<double,3,1>(
-                0, 0, xyEst.xHat(xyEst.YAW)));
-        Eigen::Affine3d delta_pose_in_body_frame;
-        delta_pose_in_body_frame = delta_pose_wrt_keyframe_in_BL_frame * body_level_to_body_frame;
-        Eigen::Affine3d body_in_optitrack_frame;
-        body_in_optitrack_frame = xyEst.global_pose_p *  delta_pose_in_body_frame;
-        xyzPose.pose = tf2::toMsg(body_in_optitrack_frame);
-        xyzPose.header = xyzState.header;
-        xyzPose.pose.position.z = zEst.xHat(0);
-
-
-
-        pose_publisher_.publish(xyzPose);
 
         if (debug_mode_)
         {
@@ -608,10 +598,10 @@ namespace reef_estimator
             xyzDebugState.xy_plus.sigma_minus[0] = xyzDebugState.xy_plus.x_dot - xySigma(0);
             xyzDebugState.xy_plus.sigma_plus[1] = xyzDebugState.xy_plus.y_dot + xySigma(1);
             xyzDebugState.xy_plus.sigma_minus[1] = xyzDebugState.xy_plus.y_dot - xySigma(1);
-            xyzDebugState.xy_plus.sigma_plus[2] = xyzDebugState.xy_plus.pitch_bias + xySigma(2);
-            xyzDebugState.xy_plus.sigma_minus[2] = xyzDebugState.xy_plus.pitch_bias - xySigma(2);
-            xyzDebugState.xy_plus.sigma_plus[3] = xyzDebugState.xy_plus.roll_bias + xySigma(3);
-            xyzDebugState.xy_plus.sigma_minus[3] = xyzDebugState.xy_plus.roll_bias - xySigma(3);
+            xyzDebugState.xy_plus.sigma_plus[2] = xyzDebugState.xy_plus.roll_bias + xySigma(2);
+            xyzDebugState.xy_plus.sigma_minus[2] = xyzDebugState.xy_plus.roll_bias - xySigma(2);
+            xyzDebugState.xy_plus.sigma_plus[3] = xyzDebugState.xy_plus.pitch_bias + xySigma(3);
+            xyzDebugState.xy_plus.sigma_minus[3] = xyzDebugState.xy_plus.pitch_bias - xySigma(3);
             xyzDebugState.xy_plus.sigma_plus[4] = xyzDebugState.xy_plus.xa_bias + xySigma(4);
             xyzDebugState.xy_plus.sigma_minus[4] = xyzDebugState.xy_plus.xa_bias - xySigma(4);
             xyzDebugState.xy_plus.sigma_plus[5] = xyzDebugState.xy_plus.ya_bias + xySigma(5);
@@ -658,5 +648,28 @@ namespace reef_estimator
         return sqrt(x * x + y * y + z * z);
     }
 
+    void XYZEstimator::integrateGlobalPose(){
+        current_deltaXY << xyEst.xHat(xyEst.PX), xyEst.xHat(xyEst.PY), 0;
+//        current_estimate.translation() = Eigen::Vector3d(xyEst.xHat(xyEst.PX), xyEst.xHat(xyEst.PY),0);
+        C3_Yaw<< cos(global_yaw), sin(global_yaw),0,
+                -sin(global_yaw), cos(global_yaw),0,
+                0,                                    0,          1.0;
+
+        //Compound current delta pose with global pose
+        Eigen::Affine3d displayed_pose;
+        Eigen::Vector3d displayed_global_position;
+        double displayed_global_yaw;
+        displayed_global_position << global_pose.translation() + C3_Yaw.transpose()*current_deltaXY;
+        displayed_global_yaw = global_yaw + xyEst.xHat(xyEst.YAW);
+
+        //Publish the accumulated pose
+        xyzPose.pose.position.x = displayed_global_position.x();
+        xyzPose.pose.position.y = displayed_global_position.y();
+        xyzPose.pose.position.z = (displayed_global_yaw)*57.3;
+        xyzPose.header = xyzState.header;
+        pose_publisher_.publish(xyzPose);
+
+
+    }
 
 }
