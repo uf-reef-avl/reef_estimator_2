@@ -96,7 +96,13 @@ namespace reef_estimator
         Eigen::Vector3d Mahalanobis_D_hat;
         Eigen::Vector2d measurement;
         Eigen::Vector2d expected_rgbd;
-
+        Eigen::Affine3d current_estimate;
+        Eigen::Affine3d global_pose;
+        Eigen::Matrix3d C_level_keyframe_to_body_keyframe_at_k;
+        Eigen::Vector3d current_deltaXY;
+        Eigen::Matrix3d C3_Yaw;
+        double roll_init, pitch_init, yaw_init;
+        double global_yaw;
 
 
         double beta_0;

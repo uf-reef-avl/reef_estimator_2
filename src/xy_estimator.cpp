@@ -223,14 +223,9 @@ namespace reef_estimator
         P = P + (F * P.transpose() + P * F.transpose() + G * Q * G.transpose()) * dt;
 //        P = F*P*F.transpose() + G*Q*G.transpose();
 
-        current_estimate.translation() = Eigen::Vector3d(xHat(PX), xHat(PY),0);
-        Eigen::Matrix3d C3_Yaw;
-        C3_Yaw<< cos(xHat(YAW)), sin(xHat(YAW)),0,
-                -sin(xHat(YAW)), cos(xHat(YAW)),0,
-                0,                                    0,          1.0;
-        current_estimate.linear() = C3_Yaw.transpose();
 
-        distance = sqrt(pow(xHat(6), 2) + pow(xHat(7), 2));
+
+        distance = sqrt(pow(xHat(PX), 2) + pow(xHat(PY), 2));
 
 
     }
@@ -247,11 +242,6 @@ namespace reef_estimator
 
     void XYEstimator::relativeReset(){
         ROS_WARN_STREAM("STATE RESET");
-        //Save states at the time of keyframe
-        C_level_keyframe_to_body_keyframe_at_k = C_body_level_to_body_frame;
-        global_pose = global_pose * current_estimate;
-
-
         //Tell the odometry node to keyframe via an empty message.
         std_msgs::Empty empty;
         keyframe_now.publish(empty);
