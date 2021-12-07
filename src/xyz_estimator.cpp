@@ -309,15 +309,12 @@ namespace reef_estimator
 
     //Mocap XY Pose update
     void XYZEstimator::deltaPoseUpdate(geometry_msgs::PoseStamped pose_msg){
-        // TODO: Humberto please do all the coordinate frame transforms. It needs to go before chi2 rejection
-
         Eigen::Matrix3d delta_C;
         delta_C = reef_msgs::quaternion_to_rotation(pose_msg.pose.orientation);
 
         Eigen::Vector3d delta_p_camera_frame;
         delta_p_camera_frame << pose_msg.pose.position.x, pose_msg.pose.position.y, pose_msg.pose.position.z;
         Eigen::Vector3d delta_p_body_level_k_to_body_level_kplus1;
-//        ROS_WARN_STREAM("BODY TO CAM P"<<xyEst.p_body_to_camera);
         delta_p_body_level_k_to_body_level_kplus1 << C_level_keyframe_to_body_keyframe_at_k.transpose() *( xyEst.p_body_to_camera + xyEst.C_body_to_camera.transpose() * ( delta_p_camera_frame + delta_C.transpose()*xyEst.C_body_to_camera*(-xyEst.p_body_to_camera)) );
 
         Eigen::Matrix3d delta_C_level_k_to_level_kplus1;
@@ -552,8 +549,6 @@ namespace reef_estimator
 
     void XYZEstimator::publishEstimates()
     {
-        // TODO: Humberto/Grant: Publish the integrated position as a geometry_msg/PoseStamped
-        // TODO: Humberto/Grant: Publish the xyz_estimate with position and velocity here
         //Publish XY and Z states
 
         xyzState.xy_plus.x_dot = xyEst.xHat(0);
@@ -670,7 +665,14 @@ namespace reef_estimator
         //Publish the accumulated pose
         xyzPose.pose.position.x = displayed_global_position.x();
         xyzPose.pose.position.y = displayed_global_position.y();
-        xyzPose.pose.position.z = (displayed_global_yaw)*57.3;
+        xyzPose.pose.position.z = zEst.xHat(0);
+	
+	double roll, pitch, yaw;
+        reef_msgs::roll_pitch_yaw_from_rotation321(C_NED_to_body_frame, roll, pitch, yaw);
+        roll += xyEst.xHat(2);
+        pitch += xyEst.xHat(3);
+        yaw = displayed_global_yaw;
+	xyzPose.pose.orientation = reef_msgs::fromEulerAngleToQuaternion<Eigen::Matrix<double,3,1>, geometry_msgs::Quaternion>(Eigen::Matrix<double, 3, 1>(yaw,pitch,roll), "321");
         xyzPose.header = xyzState.header;
         pose_publisher_.publish(xyzPose);
 
