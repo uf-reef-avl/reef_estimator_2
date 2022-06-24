@@ -14,32 +14,14 @@ namespace reef_estimator
             rc_subscriber_ = nh_.subscribe("rc_raw", 1, &SensorManager::rcRawCallback, this);
         }
 
-        if (xyzEst.enableMocapXY)
-        {
-            private_nh_.param<std::string>("mocap_twist_topic", mocapTwistTopic, "mocap_velocity/body_level_frame");
-            mocap_twist_subscriber_ = nh_.subscribe(mocapTwistTopic, 1, &SensorManager::mocapTwistCallback, this);
-        }
+        std::string mocapPoseTopic;
+        private_nh_.param<std::string>("mocap_pose_topic", mocapPoseTopic, "true_odom");
+        delta_pose_subscriber_ = nh_.subscribe<geometry_msgs::PoseWithCovarianceStamped>("true_odom", 1, &SensorManager::deltaPoseCallback, this);
 
-        if (xyzEst.enableMocapZ)
-        {
-            private_nh_.param<std::string>("mocap_pose_topic", mocapPoseTopic, "mocap_ned");
-            mocap_pose_subscriber_ = nh_.subscribe(mocapPoseTopic, 1, &SensorManager::mocapPoseCallback, this);
-        }
+        altimeter_subscriber_ = nh_.subscribe("altimeter", 1, &SensorManager::altimeterCallback, this);
+        if(xyzEst.debug_mode_)
+            range_ned_publisher_ = nh_.advertise<sensor_msgs::Range>("sonar_ned", 1);
 
-        if (xyzEst.enableRGBD) {
-            private_nh_.param<std::string>("rgbd_twist_topic", rgbdTwistTopic, "rgbd_velocity_body_frame");
-            rgbd_twist_subscriber_ = nh_.subscribe(rgbdTwistTopic, 1, &SensorManager::rgbdTwistCallback, this);
-
-        }
-
-        if (xyzEst.enableSonar)
-        {
-            altimeter_subscriber_ = nh_.subscribe("sonar", 1, &SensorManager::altimeterCallback, this);
-            if(xyzEst.debug_mode_)
-                range_ned_publisher_ = nh_.advertise<sensor_msgs::Range>("sonar_ned", 1);
-        }
-
-        //Initialize subscribers with corresponding callbacks.
         imu_subscriber_ = nh_.subscribe("imu/data", 10, &SensorManager::imuCallback, this);
 
     }
@@ -88,29 +70,15 @@ namespace reef_estimator
         }
     }
 
-    void SensorManager::mocapPoseCallback(const geometry_msgs::PoseStampedConstPtr &msg)
-    {
-        xyzEst.mocapUpdate(*msg);
+    void SensorManager::deltaPoseCallback(const geometry_msgs::PoseWithCovarianceStampedConstPtr &msg) {
+
+        geometry_msgs::PoseStamped delta_pose;
+        delta_pose.pose = msg->pose.pose;
+        delta_pose.header = msg->header;
+        xyzEst.deltaPoseUpdate(delta_pose);
     }
 
-    void SensorManager::mocapTwistCallback(const geometry_msgs::TwistWithCovarianceStampedConstPtr &msg)
-    {
-        xyzEst.mocapUpdate(*msg);
-    }
-
-    void SensorManager::rgbdTwistCallback(const reef_msgs::DeltaToVelConstPtr &msg)
-    {
-      private_nh_.param<bool>("enable_measurements", get_measurements, true);
-        if(get_measurements) {
-            xyzEst.rgbdUpdate(*msg);
-        }
-        else {
-            ROS_WARN_STREAM("You stopped the measurements! Why?? ");
-        }
-    }
-
-    void SensorManager::altimeterCallback(const sensor_msgs::RangeConstPtr &msg)
-    {
+    void SensorManager::altimeterCallback(const sensor_msgs::RangeConstPtr &msg){
         xyzEst.sensorUpdate(*msg);
 
         if (xyzEst.debug_mode_)
@@ -122,5 +90,7 @@ namespace reef_estimator
             range_ned_publisher_.publish(range_msg_ned);
         }
     }
+
+
 
 }

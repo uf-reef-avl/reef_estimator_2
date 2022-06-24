@@ -16,13 +16,8 @@
 #include <reef_msgs/XYZDebugEstimate.h>
 #include <reef_msgs/XYZEstimate.h>
 #include <reef_msgs/DeltaToVel.h>
+#include <reef_msgs/ReefMsgsConversionAPI.h>
 
-/////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-#include <sensor_msgs/MagneticField.h>
-
-#include "MatrixExponential.h"
-
-/////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "z_estimator.h"
 #include "xy_estimator.h"
@@ -47,10 +42,8 @@ namespace reef_estimator
         ros::Publisher state_publisher_;
         ros::Publisher debug_state_publisher_;
         ros::Publisher is_flying_publisher_;
-/////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-	ros::Publisher yaw_publisher_;
-/////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
+        ros::Publisher pose_publisher_;
+        ros::Publisher delta_measurement_publisher_;
 
         //Estimator enable/disable variables
         bool enableXY;
@@ -65,6 +58,7 @@ namespace reef_estimator
         //Message holders
         reef_msgs::XYZEstimate xyzState;
         reef_msgs::XYZDebugEstimate xyzDebugState;
+        geometry_msgs::PoseStamped xyzPose;
 
         int numberOfPropagations;
 
@@ -81,16 +75,16 @@ namespace reef_estimator
         double dt;
         bool enable_partial_update;
         int sigma_mulitplier;
+        geometry_msgs::PoseStamped delta_msg;
 
 
-      //Takeoff detection variables
+        //Takeoff detection variables
         std_msgs::Bool takeoffState;
         bool accTakeoffState, sonarTakeoffState;
         int numAccSamples, numSonarSamples;
         double accSamples[ACC_SAMPLE_SIZE], sonarSamples[SONAR_SAMPLE_SIZE];
         double accMean, accVariance, sonarMean, sonarVariance;
-        bool newRgbdMeasurement, newSonarMeasurement;
-        bool initialize_with_mocap;
+        bool newDeltaMeasurement, newSonarMeasurement;
         int rgbdCounter;
 
         Eigen::Matrix3d C_NED_to_body_frame;
@@ -103,24 +97,31 @@ namespace reef_estimator
         Eigen::Vector3d Mahalanobis_D_hat;
         Eigen::Vector2d measurement;
         Eigen::Vector2d expected_rgbd;
+        Eigen::Affine3d current_estimate;
+        Eigen::Affine3d global_pose;
+        Eigen::Matrix3d C_level_keyframe_to_body_keyframe_at_k;
+        Eigen::Vector3d current_deltaXY;
+        Eigen::Matrix3d C3_Yaw;
+        double roll_init, pitch_init, yaw_init;
+        double global_yaw;
+
 
         double beta_0;
         Eigen::MatrixXd xySigma;
         Eigen::Vector3d zSigma;
-        
+
         void checkTakeoffState(double accMagnitude);
         void publishEstimates();
         void saveMinusState();
 
         void initializeAcc(geometry_msgs::Vector3 acc);
         bool chi2Accept(float range_measurement);
-        bool chi2AcceptRgbd(geometry_msgs::TwistWithCovarianceStamped twist_msg);
 
-        bool chi2AcceptMocapXY(geometry_msgs::TwistWithCovarianceStamped twist_msg);
-        bool chi2AcceptMocapZ(float z_mocap_ned);
-        
+        bool chi2AcceptDeltaPose(geometry_msgs::PoseStamped pose);
+
         bool hypothesisAccept(float range_measurement);
-        float correctRange(float range_measurement);
+        void integrateGlobalPose();
+
 
     public:
         XYZEstimator();
@@ -133,39 +134,33 @@ namespace reef_estimator
 
         void sensorUpdate(sensor_msgs::Imu imu);
         void sensorUpdate(sensor_msgs::Range range_msg);
-        void mocapUpdate(geometry_msgs::PoseStamped pose_msg);
-        void mocapUpdate(geometry_msgs::TwistWithCovarianceStamped twist_msg);
-        void rgbdUpdate(reef_msgs::DeltaToVel twist_msg);
-        
-///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////        
-        
+        void deltaPoseUpdate(geometry_msgs::PoseStamped pose_msg);
+
+
         Eigen::MatrixXd imu_gyro;
-        
+
         Eigen::MatrixXd w_last;
         Eigen::MatrixXd w0;
         Eigen::MatrixXd w;
-        
+
         Eigen::MatrixXd q0;
         Eigen::MatrixXd q;
         Eigen::MatrixXd q_dot;
-        
+
         double q1;	// x
         double q2;	// y
         double q3;	// z
         double q4;	// w
-        
-        
+
         double psi_imu;
-        
-        
+
+
         void gyro_to_orientation_disc(Eigen::MatrixXd imu_gyro, Eigen::MatrixXd &q, double dt, Eigen::MatrixXd &w_last);
         Eigen::MatrixXd omega_generator(double a, double b, double c);
         double yaw_calc_imu(double q1, double q2, double q3, double q4);
-        void sensorUpdate(sensor_msgs::MagneticField mag_msg);    
-        
-  /////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////      
 
-        };
+
+    };
 
     double getVectorMagnitude(double x, double y, double z);
 }

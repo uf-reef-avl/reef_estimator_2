@@ -7,6 +7,9 @@
 
 #include "estimator.h"
 #include "../../reef_msgs/include/reef_msgs/dynamics.h"
+#include <std_msgs/Empty.h>
+#include <reef_msgs/ReefMsgsConversionAPI.h>
+
 
 namespace reef_estimator
 {
@@ -18,16 +21,29 @@ namespace reef_estimator
         /*This class is inherited from Estimator, thus
             it has update and propagate methods already.
          */
+        ros::NodeHandle nh_;
+        ros::Publisher relativeReset_publisher_;
+        ros::Publisher keyframe_now;
 
         Eigen::Matrix3d C_body_to_body_fixed_frame;
         void nonlinearPropagation(Eigen::Matrix3d &C,double initialAcc, Eigen::Vector3d accel_in_body, Eigen::Vector3d gyro_in_body, float bias_z_in_NED_component);
         void resetLandingState();
-        void updateGPSState(Eigen::Vector3d pose);
+        void relativeReset();
 
         Eigen::Matrix3d C_body_level_to_body_frame ;
+        Eigen::Affine3d body_to_camera;
+        Eigen::Vector3d p_body_to_camera;
+        Eigen::Matrix3d C_body_to_camera;
+
         Eigen::Vector3d nonLinearDynamics;
         Eigen::Matrix2d Id;
-        Eigen::Matrix3d R_GPS;
+        Eigen::Affine3d global_pose_p;
+        Eigen::Affine3d keyframe_in_body_frame;
+
+        Eigen::Affine3d pose_gain_from_propagation;
+
+
+        // orientation variables
         double pitch;
         double roll;
         double yaw;
@@ -37,27 +53,55 @@ namespace reef_estimator
         double pitch_est;
         double roll_est;
         double yaw_est;
+
+        // variables for simplification of F matrix
         double xc;
         double yc;
         double zc;
         double pe;
         double re;
         double ye;
+
+        // true orientation (used for heading)
         geometry_msgs::Quaternion  orient0;
-        Eigen::Quaterniond q;
         double phi;
         double theta;
         double psi;
+
+        // distance propagated
         double distance;
 
-        enum StateIndicies
-        {
-            U,   V,       // Velocity (body frame)
-            BWX, BWY,      // Gyro Biases
-            BAX, BAY,       // Accel Biases
-            PX,  PY, YAW     // Position (body wrt world frame)
-        };
+        // accumulated variables to be published
+        double global_x;
+        double global_y;
+        double global_yaw;
+        double accum_x_vel;
+        double accum_y_vel;
 
+        // msg if want to publish deltas
+        geometry_msgs::PoseStamped Delta;
+
+        bool XYTakeoff;
+
+        int resetCount;
+        double lastYaw;
+        double lastX;
+        double lastY;
+        double lastX_vel;
+        double lastY_vel;
+
+        double dPoseLimit;
+        double dYawLimit;
+        double dTimeLimit;
+
+        bool want_delta;
+        enum StateIndicies
+        {   VX,   VY,
+            BR, BP,
+            BAX, BAY,
+            PX,  PY, YAW,
+            BGX, BGY,BGZ
+        };
     };
 }
 
