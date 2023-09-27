@@ -78,7 +78,7 @@ namespace reef_estimator
         geometry_msgs::PoseStamped delta_msg;
 
 
-        //Takeoff detection variables
+      //Takeoff detection variables
         std_msgs::Bool takeoffState;
         bool accTakeoffState, sonarTakeoffState;
         int numAccSamples, numSonarSamples;
@@ -109,7 +109,7 @@ namespace reef_estimator
         double beta_0;
         Eigen::MatrixXd xySigma;
         Eigen::Vector3d zSigma;
-
+        
         void checkTakeoffState(double accMagnitude);
         void publishEstimates();
         void saveMinusState();
@@ -118,12 +118,12 @@ namespace reef_estimator
         bool chi2Accept(float range_measurement);
 
         bool chi2AcceptDeltaPose(geometry_msgs::PoseStamped pose);
-
+        
         bool hypothesisAccept(float range_measurement);
         void integrateGlobalPose();
 
 
-    public:
+            public:
         XYZEstimator();
         ~XYZEstimator();
 
@@ -135,32 +135,32 @@ namespace reef_estimator
         void sensorUpdate(sensor_msgs::Imu imu);
         void sensorUpdate(sensor_msgs::Range range_msg);
         void deltaPoseUpdate(geometry_msgs::PoseStamped pose_msg);
-
+        
 
         Eigen::MatrixXd imu_gyro;
-
+        
         Eigen::MatrixXd w_last;
         Eigen::MatrixXd w0;
         Eigen::MatrixXd w;
-
+        
         Eigen::MatrixXd q0;
         Eigen::MatrixXd q;
         Eigen::MatrixXd q_dot;
-
+        
         double q1;	// x
         double q2;	// y
         double q3;	// z
         double q4;	// w
 
         double psi_imu;
-
-
+        
+        
         void gyro_to_orientation_disc(Eigen::MatrixXd imu_gyro, Eigen::MatrixXd &q, double dt, Eigen::MatrixXd &w_last);
         Eigen::MatrixXd omega_generator(double a, double b, double c);
         double yaw_calc_imu(double q1, double q2, double q3, double q4);
 
 
-    };
+        };
 
     double getVectorMagnitude(double x, double y, double z);
 }

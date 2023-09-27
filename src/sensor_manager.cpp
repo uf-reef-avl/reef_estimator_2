@@ -15,10 +15,11 @@ namespace reef_estimator
         }
 
         std::string mocapPoseTopic;
-        private_nh_.param<std::string>("mocap_pose_topic", mocapPoseTopic, "true_odom");
-        delta_pose_subscriber_ = nh_.subscribe<geometry_msgs::PoseWithCovarianceStamped>("true_odom", 1, &SensorManager::deltaPoseCallback, this);
+        //private_nh_.param<std::string>("mocap_pose_topic", mocapPoseTopic, "true_odom");
+        private_nh_.param<std::string>("mocap_pose_topic", mocapPoseTopic, "vo_sim/camera_frame/deltas");
+        delta_pose_subscriber_ = nh_.subscribe<geometry_msgs::PoseWithCovarianceStamped>("vo_sim/camera_frame/deltas", 1, &SensorManager::deltaPoseCallback, this);
 
-        altimeter_subscriber_ = nh_.subscribe("altimeter", 1, &SensorManager::altimeterCallback, this);
+        altimeter_subscriber_ = nh_.subscribe("vo_sim/nwu/altimeter", 1, &SensorManager::altimeterCallback, this);
         if(xyzEst.debug_mode_)
             range_ned_publisher_ = nh_.advertise<sensor_msgs::Range>("sonar_ned", 1);
 

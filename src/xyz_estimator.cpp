@@ -4,6 +4,7 @@
 
 #include "xyz_estimator.h"
 #include <iostream>
+#include <reef_msgs/Quaternion.h>
 
 namespace reef_estimator
 {
@@ -95,11 +96,11 @@ namespace reef_estimator
         //Save the initial level keyframe
         //global_yaw  = euler(0,0);
 
-        reef_msgs::roll_pitch_yaw_from_quaternion(pose_msg->pose.orientation,roll_init, pitch_init, yaw_init);
+	reef_msgs::roll_pitch_yaw_from_quaternion(pose_msg->pose.orientation,roll_init, pitch_init, yaw_init);
         //Save the initial level keyframe
         global_yaw  = yaw_init;
-
-        global_pose.linear() = reef_msgs::DCM_from_Euler321(Eigen::Vector3d (0,0,global_yaw)).transpose(); //TODO: Verify this line
+        
+	global_pose.linear() = reef_msgs::DCM_from_Euler321(Eigen::Vector3d (0,0,global_yaw)).transpose(); //TODO: Verify this line
         global_pose.translation() = Eigen::Vector3d (pose_msg->pose.position.x,pose_msg->pose.position.y,0.0);
         xyEst.XYTakeoff = false;
         //Initialize the keyframe
@@ -124,8 +125,8 @@ namespace reef_estimator
 
 
         state_publisher_ = nh_.advertise<reef_msgs::XYZEstimate>("xyz_estimate", 1, true);
-        pose_publisher_ =  nh_.advertise<geometry_msgs::PoseStamped>("xyz_pose", 1, true);
-        delta_measurement_publisher_ =  nh_.advertise<geometry_msgs::PoseStamped>("delta_measurement", 1, true);
+        pose_publisher_ =  nh_.advertise<geometry_msgs::PoseStamped>("estimator/ned/pose_from_initial_frame", 1, true);
+        delta_measurement_publisher_ =  nh_.advertise<geometry_msgs::PoseStamped>("estimator/delta_measurement", 1, true);
 
         if (debug_mode_) {
             debug_state_publisher_ = nh_.advertise<reef_msgs::XYZDebugEstimate>("xyz_debug_estimate", 1, true);
@@ -143,7 +144,7 @@ namespace reef_estimator
             ROS_INFO_STREAM("z_R: " << std::endl << zEst.R);
             ROS_INFO_STREAM("z_beta: " << std::endl << zEst.betaVector << std::endl);
         }
-
+        
         is_flying_publisher_ = nh_.advertise<std_msgs::Bool>("is_flying_reef", 1, true);
 
         //Initialize member variables
@@ -164,7 +165,7 @@ namespace reef_estimator
         accSampleAverage.z += acc.z;
         accInitSampleCount++;
 
-        if (accInitSampleCount == ACC_SAMPLE_SIZE)
+        if (accInitSampleCount == ACC_SAMPLE_SIZE) 
         {
             accSampleAverage.x /= ACC_SAMPLE_SIZE;
             accSampleAverage.y /= ACC_SAMPLE_SIZE;
@@ -178,7 +179,7 @@ namespace reef_estimator
         }
     }
 /** Sensor update for the IMU. */
-    void XYZEstimator::sensorUpdate(sensor_msgs::Imu imu)
+    void XYZEstimator::sensorUpdate(sensor_msgs::Imu imu) 
     {
         //Save the stamp. This is very important for good book-keeping.
         xyzState.header.stamp = imu.header.stamp;
@@ -278,7 +279,9 @@ namespace reef_estimator
         integrateGlobalPose();
 
         publishEstimates();
+
         if (((xyEst.distance > xyEst.dPoseLimit)) || (abs(xyEst.xHat(xyEst.YAW)) > xyEst.dYawLimit)) {
+
             //Save states at the time of keyframe
             C_level_keyframe_to_body_keyframe_at_k = xyEst.C_body_level_to_body_frame;
             global_pose.translation() = global_pose.translation() + C3_Yaw.transpose()*current_deltaXY;
@@ -291,7 +294,7 @@ namespace reef_estimator
     }
 
     //Sonar update
-    void XYZEstimator::sensorUpdate(sensor_msgs::Range range_msg)
+    void XYZEstimator::sensorUpdate(sensor_msgs::Range range_msg) 
     {
 
         if (range_msg.range <= range_msg.max_range)
@@ -326,7 +329,16 @@ namespace reef_estimator
         delta_msg.pose.position.x =   xyEst.z(0);
         delta_msg.pose.position.y =   xyEst.z(1);
         delta_msg.pose.position.z =   xyEst.z(2);
-        delta_measurement_publisher_.publish(delta_msg);
+        Eigen::Quaterniond delta_quaternion_level_k_to_level_kplus1;
+        Eigen::Matrix3d CMatt = delta_C_level_k_to_level_kplus1;
+      
+        //delta_quaternion_level_k_to_level_kplus1 = reef_msgs::fromDCMToQuaternion(&CMatt);
+	
+        delta_msg.pose.orientation.w = delta_yaw;
+        //delta_msg.pose.orientation.x = delta_quaternion_level_k_to_level_kplus1.x();
+        //delta_msg.pose.orientation.y = delta_quaternion_level_k_to_level_kplus1.y();
+        //delta_msg.pose.orientation.z = delta_quaternion_level_k_to_level_kplus1.z();
+        delta_measurement_publisher_.publish(delta_msg); //This seems to be here for debugging purposes.
 
 //TODO: Include the rejection scheme for the delta measurements.
         if (chi2AcceptDeltaPose(delta_msg)){
@@ -334,7 +346,7 @@ namespace reef_estimator
         }
     }
 
-    bool XYZEstimator::chi2Accept(float range_measurement)
+    bool XYZEstimator::chi2Accept(float range_measurement) 
     {
         //Compute Mahalanobis distance.
         range = Eigen::VectorXd(1);
@@ -354,7 +366,7 @@ namespace reef_estimator
         {
             ROS_INFO_STREAM("Range measurement rejected");
             return false;
-        }
+        } 
         else
         {
             return true;
@@ -379,7 +391,7 @@ namespace reef_estimator
         {
             ROS_INFO_STREAM("MOCAP XY measurement rejected");
             return false;
-        }
+        } 
         else
             return true;
     }
@@ -403,34 +415,34 @@ namespace reef_estimator
         //ROS_INFO_STREAM(logLR);
         //ROS_INFO_STREAM(prior_ratio);
 
-        if (logLR >= prior_ratio)
+        if (logLR >= prior_ratio) 
         {
             //measurement accepted
             return true;
-        }
-        else
+        } 
+        else 
         {
             ROS_INFO_STREAM("Range measurement rejected");
             return false;
         }
     }
 
-    void XYZEstimator::checkTakeoffState(double accMagnitude)
+    void XYZEstimator::checkTakeoffState(double accMagnitude) 
     {
         sonarTakeoffState = zEst.z(0) <= -0.18;
 
         //Check variance of accelerometer vector magnitude
         if ((!accTakeoffState) || (!sonarTakeoffState && accTakeoffState))
         {
-            if (numAccSamples < ACC_SAMPLE_SIZE)
+            if (numAccSamples < ACC_SAMPLE_SIZE) 
             {
                 accSamples[numAccSamples++] = accMagnitude;
-            }
-            else
+            } 
+            else 
             {
                 //shift sample in and compute the sample mean simultaneously
                 accMean = 0;
-                for (int i = 0; i < ACC_SAMPLE_SIZE - 1; i++)
+                for (int i = 0; i < ACC_SAMPLE_SIZE - 1; i++) 
                 {
                     accSamples[i] = accSamples[i + 1];
                     accMean += accSamples[i];
@@ -441,7 +453,7 @@ namespace reef_estimator
 
                 //Finally, compute the sample variance
                 accVariance = 0;
-                for (int i = 0; i < ACC_SAMPLE_SIZE; i++)
+                for (int i = 0; i < ACC_SAMPLE_SIZE; i++) 
                 {
                     double distFromMean = accSamples[i] - accMean;
                     accVariance += (distFromMean * distFromMean);
@@ -449,22 +461,22 @@ namespace reef_estimator
                 accVariance /= (double) (ACC_SAMPLE_SIZE - 1);
                 accTakeoffState = accVariance >= ACC_TAKEOFF_VARIANCE;
             }
-        }
-        else if (numAccSamples > 0)
+        } 
+        else if (numAccSamples > 0) 
         {
             numAccSamples = 0;
         }
 
         //Publish changes in takeoff state
-        if (accTakeoffState && sonarTakeoffState && !takeoffState.data)
+        if (accTakeoffState && sonarTakeoffState && !takeoffState.data) 
         {
             ROS_INFO("Takeoff!");
             zEst.setTakeoffState(true);
             xyEst.XYTakeoff = true;
             takeoffState.data = true;
             is_flying_publisher_.publish(takeoffState);
-        }
-        else if (!accTakeoffState && !sonarTakeoffState && takeoffState.data)
+        } 
+        else if (!accTakeoffState && !sonarTakeoffState && takeoffState.data) 
         {
             ROS_INFO("Landing!");
             zEst.setTakeoffState(false);
@@ -641,7 +653,7 @@ namespace reef_estimator
     }
 
     //Utility function
-    double getVectorMagnitude(double x, double y, double z)
+    double getVectorMagnitude(double x, double y, double z) 
     {
         return sqrt(x * x + y * y + z * z);
     }
@@ -664,13 +676,13 @@ namespace reef_estimator
         xyzPose.pose.position.x = displayed_global_position.x();
         xyzPose.pose.position.y = displayed_global_position.y();
         xyzPose.pose.position.z = zEst.xHat(0);
-
-        double roll, pitch, yaw;
+	
+	double roll, pitch, yaw;
         reef_msgs::roll_pitch_yaw_from_rotation321(C_NED_to_body_frame, roll, pitch, yaw);
         roll += xyEst.xHat(2);
         pitch += xyEst.xHat(3);
         yaw = displayed_global_yaw;
-        xyzPose.pose.orientation = reef_msgs::fromEulerAngleToQuaternion<Eigen::Matrix<double,3,1>, geometry_msgs::Quaternion>(Eigen::Matrix<double, 3, 1>(yaw,pitch,roll), "321");
+	xyzPose.pose.orientation = reef_msgs::fromEulerAngleToQuaternion<Eigen::Matrix<double,3,1>, geometry_msgs::Quaternion>(Eigen::Matrix<double, 3, 1>(yaw,pitch,roll), "321");
         xyzPose.header = xyzState.header;
         pose_publisher_.publish(xyzPose);
 

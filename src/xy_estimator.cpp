@@ -32,13 +32,13 @@ namespace reef_estimator
 
         z = Eigen::MatrixXd(3,1);
         z << 0.0,
-                0.0,
-                0.0;
+             0.0,
+             0.0;
 
         H = Eigen::MatrixXd(3,12);
         H <<  0, 0, 0, 0, 0, 0, 1.0, 0, 0, 0, 0, 0,
-                0, 0, 0, 0, 0, 0, 0, 1.0, 0, 0, 0, 0,
-                0, 0, 0, 0, 0, 0, 0, 0, 1.0, 0, 0, 0;
+              0, 0, 0, 0, 0, 0, 0, 1.0, 0, 0, 0, 0,
+              0, 0, 0, 0, 0, 0, 0, 0, 1.0, 0, 0, 0;
 
         xHat0 = Eigen::MatrixXd(12,1);
         xHat = Eigen::MatrixXd(12,1);
@@ -55,15 +55,15 @@ namespace reef_estimator
         phi = 0.;
         theta = 0.;
         psi = 0.;
-        reef_msgs::loadTransform("body_to_camera",body_to_camera);
+        reef_msgs::loadTransform("reef_estimator/body_to_camera",body_to_camera);
         ROS_WARN_STREAM("[REEF EST]:: Body to camera \n" << body_to_camera.matrix());
         //Initialize the keyframe
         C_body_to_camera = body_to_camera.linear().transpose();
         p_body_to_camera = body_to_camera.translation();
 
         ROS_WARN_STREAM("[C]:: Body to camera \n" << C_body_to_camera);
-        relativeReset_publisher_ = nh_.advertise<geometry_msgs::PoseStamped>("deltaState", 1, true);
-        keyframe_now = nh_.advertise<std_msgs::Empty>("keyframe_now",1);
+        relativeReset_publisher_ = nh_.advertise<geometry_msgs::PoseStamped>("estimator/deltaState", 1, true);
+        keyframe_now = nh_.advertise<std_msgs::Empty>("estimator/keyframe_signal",1);
 
 
     }
@@ -81,13 +81,13 @@ namespace reef_estimator
         pitch_est = pitch - pitch_bias;
         roll_est = roll - roll_bias;
         //Pitch and roll
-        C_body_level_to_body_frame << cos(pitch_est), 0, -sin(pitch_est),
-                sin(roll_est) * sin(pitch_est), cos(roll_est), sin(roll_est) * cos(pitch_est),
-                cos(roll_est) * sin(pitch_est), -sin(roll_est), cos(roll_est) * cos(pitch_est);
+                C_body_level_to_body_frame << cos(pitch_est), 0, -sin(pitch_est),
+                                              sin(roll_est) * sin(pitch_est), cos(roll_est), sin(roll_est) * cos(pitch_est),
+                                              cos(roll_est) * sin(pitch_est), -sin(roll_est), cos(roll_est) * cos(pitch_est);
 
         Eigen::Matrix2d C3_Yaw_2x2;
         C3_Yaw_2x2<< cos(xHat(YAW)), sin(xHat(YAW)),
-                -sin(xHat(YAW)), cos(xHat(YAW));
+             -sin(xHat(YAW)), cos(xHat(YAW));
 //        C_body_level_to_body_frame= C_body_level_to_body_frame*C3_Yaw_2x2
 //      2;
 
@@ -129,8 +129,8 @@ namespace reef_estimator
 
         Eigen::Matrix3d A;//Attitude influence matrix 321ypr (only third row). Kinematic singularity at pitch_est = 90deg
         A << 0,0,0,
-                0,0,0,
-                0, sin(roll_est)/cos(pitch_est),cos(roll_est)/cos(pitch_est);
+             0,0,0,
+             0, sin(roll_est)/cos(pitch_est),cos(roll_est)/cos(pitch_est);
 //        gyro_in_body_level_frame = A*( gyroxyz_in_body_frame + xHat.block<3,1>(BGX,0));
 
 
@@ -178,7 +178,7 @@ namespace reef_estimator
 
         Eigen::MatrixXd partialV_partialBiasAttitude = Eigen::MatrixXd(2, 2);
         partialV_partialBiasAttitude << - yc * sin(pe) * cos(re) + zc * sin(re) * sin(pe), xc * sin(pe) - yc * sin(re) * cos(pe) - zc * cos(re) * cos(pe),
-                yc*sin(re) + zc* cos(re),                                       0.0;
+                                         yc*sin(re) + zc* cos(re),                                       0.0;
 
 //        partialC_partialBiasAttitude << sin(pe) * xc - sin(re) * cos(pe) * yc - cos(re) * cos(pe) * zc, -cos(re) * sin(pe) * yc + sin(re) * sin(pe) * zc,
 //                                         0.0,                                                            sin(re) * yc + cos(re) * zc;
@@ -187,7 +187,7 @@ namespace reef_estimator
 
         Eigen::MatrixXd PartialYawPartialBiasAttitude = Eigen::MatrixXd(1,2);
         PartialYawPartialBiasAttitude << -cos(pe)*cos(re)*(gyroxyz_in_body_frame(1) + xHat(BGY)) + sin(re)*cos(pe)*(gyroxyz_in_body_frame(2) +xHat(BGZ)),
-                cos(re)*(gyroxyz_in_body_frame(0) + xHat(BGX)) + sin(re)*sin(pe)*(gyroxyz_in_body_frame(1) +xHat(BGY)) + cos(re)*sin(pe)*(gyroxyz_in_body_frame(2) + xHat(BGZ));
+                                        cos(re)*(gyroxyz_in_body_frame(0) + xHat(BGX)) + sin(re)*sin(pe)*(gyroxyz_in_body_frame(1) +xHat(BGY)) + cos(re)*sin(pe)*(gyroxyz_in_body_frame(2) + xHat(BGZ));
 
 
 
@@ -222,7 +222,14 @@ namespace reef_estimator
 
         P = P + (F * P.transpose() + P * F.transpose() + G * Q * G.transpose()) * dt;
 //        P = F*P*F.transpose() + G*Q*G.transpose();
+	
+
+
+
+
         distance = sqrt(pow(xHat(PX), 2) + pow(xHat(PY), 2));
+
+
     }
 
     void XYEstimator::resetLandingState()
@@ -264,7 +271,7 @@ namespace reef_estimator
         M(BGX,BGX) = 1.0;
         M(BGY,BGY) = 1.0;
         M(BGZ,BGZ) = 1.0;
-        P = M*P*M;
+        P = M*P*M; //symmetric M
         P.block<3,3>(PX,PX) = P0.block<3,3>(PX,PX);
         resetCount++;
     }

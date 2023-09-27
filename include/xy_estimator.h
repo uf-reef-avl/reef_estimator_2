@@ -43,7 +43,7 @@ namespace reef_estimator
         Eigen::Affine3d pose_gain_from_propagation;
 
 
-        // orientation variables
+        // orientation variables 
         double pitch;
         double roll;
         double yaw;
@@ -53,7 +53,7 @@ namespace reef_estimator
         double pitch_est;
         double roll_est;
         double yaw_est;
-
+        
         // variables for simplification of F matrix
         double xc;
         double yc;
@@ -61,24 +61,24 @@ namespace reef_estimator
         double pe;
         double re;
         double ye;
-
+        
         // true orientation (used for heading)
         geometry_msgs::Quaternion  orient0;
         double phi;
         double theta;
         double psi;
-
+        
         // distance propagated
         double distance;
-
+        
         // accumulated variables to be published
         double global_x;
         double global_y;
         double global_yaw;
         double accum_x_vel;
         double accum_y_vel;
-
-        // msg if want to publish deltas
+	
+	// msg if want to publish deltas
         geometry_msgs::PoseStamped Delta;
 
         bool XYTakeoff;
@@ -93,7 +93,7 @@ namespace reef_estimator
         double dPoseLimit;
         double dYawLimit;
         double dTimeLimit;
-
+        
         bool want_delta;
         enum StateIndicies
         {   VX,   VY,
