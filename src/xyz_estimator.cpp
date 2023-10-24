@@ -4,6 +4,7 @@
 
 #include "xyz_estimator.h"
 #include <iostream>
+#include <reef_msgs/Quaternion.h>
 
 namespace reef_estimator
 {
@@ -124,8 +125,8 @@ namespace reef_estimator
 
 
         state_publisher_ = nh_.advertise<reef_msgs::XYZEstimate>("xyz_estimate", 1, true);
-        pose_publisher_ =  nh_.advertise<geometry_msgs::PoseStamped>("xyz_pose", 1, true);
-        delta_measurement_publisher_ =  nh_.advertise<geometry_msgs::PoseStamped>("delta_measurement", 1, true);
+        pose_publisher_ =  nh_.advertise<geometry_msgs::PoseStamped>("estimator/ned/pose_from_initial_frame", 1, true);
+        delta_measurement_publisher_ =  nh_.advertise<geometry_msgs::PoseStamped>("estimator/delta_measurement", 1, true);
 
         if (debug_mode_) {
             debug_state_publisher_ = nh_.advertise<reef_msgs::XYZDebugEstimate>("xyz_debug_estimate", 1, true);
@@ -328,7 +329,16 @@ namespace reef_estimator
         delta_msg.pose.position.x =   xyEst.z(0);
         delta_msg.pose.position.y =   xyEst.z(1);
         delta_msg.pose.position.z =   xyEst.z(2);
-        delta_measurement_publisher_.publish(delta_msg);
+        Eigen::Quaterniond delta_quaternion_level_k_to_level_kplus1;
+        Eigen::Matrix3d CMatt = delta_C_level_k_to_level_kplus1;
+      
+        //delta_quaternion_level_k_to_level_kplus1 = reef_msgs::fromDCMToQuaternion(&CMatt);
+	
+        delta_msg.pose.orientation.w = delta_yaw;
+        //delta_msg.pose.orientation.x = delta_quaternion_level_k_to_level_kplus1.x();
+        //delta_msg.pose.orientation.y = delta_quaternion_level_k_to_level_kplus1.y();
+        //delta_msg.pose.orientation.z = delta_quaternion_level_k_to_level_kplus1.z();
+        delta_measurement_publisher_.publish(delta_msg); //This seems to be here for debugging purposes.
 
 //TODO: Include the rejection scheme for the delta measurements.
         if (chi2AcceptDeltaPose(delta_msg)){

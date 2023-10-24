@@ -6,12 +6,14 @@ set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -O2 -I /usr/include/eigen3")
 # QTCREATOR #
 #############
 FILE(GLOB_RECURSE LibFiles "include/*")
+
 add_custom_target(headers SOURCES ${LibFiles})
 
 find_package(catkin REQUIRED COMPONENTS
     roscpp
     rospy
     geometry_msgs
+    rosflight
     rosflight_msgs
     sensor_msgs
     std_msgs
@@ -26,7 +28,8 @@ catkin_package(
     CATKIN_DEPENDS roscpp rospy sensor_msgs geometry_msgs rosflight rosflight_msgs sensor_msgs std_msgs tf2_eigen
 )
 
-include_directories(include ${catkin_INCLUDE_DIRS})
+include_directories(include ${catkin_INCLUDE_DIRS}
+        /src/torque_flight)
 
 add_executable(
     reef_estimator
