@@ -20,17 +20,15 @@
 #ifndef SENSOR_MANAGER_H
 #define SENSOR_MANAGER_H
 
-#include <ros/ros.h>
-#include <std_msgs/Bool.h>
-#include <sensor_msgs/Imu.h>
-#include <sensor_msgs/Range.h>
-#include <geometry_msgs/PoseWithCovarianceStamped.h>
-#include <rosflight_msgs/RCRaw.h>
-
-#include <reef_msgs/DeltaToVel.h>
-
-#include "xyz_estimator.h"
-#include "z_estimator.h"
+#include "rclcpp/rclcpp.hpp"
+#include <std_msgs/msg/bool.hpp>
+#include <sensor_msgs/msg/imu.hpp>
+#include <sensor_msgs/msg/range.hpp>
+#include <geometry_msgs/msg/poseWithCovarianceStamped.hpp>
+#include <rosflight_msgs/msg/RCRaw.hpp>
+#include <reef_msgs/msg/DeltaToVel.hpp>
+#include "xyz_estimator.hpp"
+#include "z_estimator.hpp"
 
 namespace reef_estimator {
     class SensorManager {

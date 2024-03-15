@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 
-import rospy
+import rclpy
 from geometry_msgs.msg import TwistWithCovarianceStamped
 from geometry_msgs.msg import PoseStamped
 from sensor_msgs.msg import Range
@@ -14,8 +14,8 @@ class verifyEstimates():
     def __init__(self):
 
         print("Verifying Estimates")
-        self.syn_pub = rospy.Publisher('sync_estimates', SyncVerifyEstimates, queue_size=10)
-        self.error_pub = rospy.Publisher('estimate_error', SyncEstimateError, queue_size=10)
+        self.syn_pub = node.create_publisher(SyncVerifyEstimates,'sync_estimates', 10)
+        self.error_pub = node.create_publisher(SyncVerifyEstimates, 'estimate_error', 10)
 
         estimate_subs = Subscriber("xyz_debug_estimates", XYZDebugEstimate)
         truth_subs = Subscriber("mocap/velocity/body_level_frame", TwistWithCovarianceStamped)
@@ -28,9 +28,12 @@ class verifyEstimates():
         self.multiplier = 1
         self.sonar_offset = 0
         use_sonar = False
-        self.multiplier = rospy.get_param("SD_Multiplied")
-        self.sonar_offset = rospy.get_param("Z_offset")
-        use_sonar = rospy.get_param("use_sonar")
+        self.multiplier = node.declare_parameter("SD_Multiplied").value
+        assert isinstance(self.multiplier, int), 'SD_Multiplied parameter must be an int'
+        self.sonar_offset = node.declare_parameter("Z_offset").value
+        assert isinstance(self.sonar_offset, int), 'Z_offset parameter must be a int'
+        use_sonar = node.declare_parameter("use_sonar").value
+        assert isinstance(use_sonar, bool), 'use_sonar parameter must be a bool'
         print(use_sonar)
 
         if use_sonar:
@@ -162,11 +165,12 @@ class verifyEstimates():
 
 
 if __name__ == '__main__':
-    rospy.init_node("verify_estimates", anonymous=False)
+    rclpy.init(args=sys.argv)
+    node = rclpy.create_node('verify_estimates')
     try:
         verifyObj = verifyEstimates()
-    except rospy.ROSInterruptException: pass
-    rospy.spin()
+    except rclpy.ROSInterruptException: pass
+    rclpy.spin()
 
 
 

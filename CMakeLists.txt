@@ -1,6 +1,7 @@
-cmake_minimum_required(VERSION 2.8.3)
+cmake_minimum_required(VERSION 3.5)
 project(reef_estimator)
 
+set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -O2 -I /usr/include/eigen3")
 #############
 # QTCREATOR #
@@ -8,26 +9,23 @@ set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -O2 -I /usr/include/eigen3")
 FILE(GLOB_RECURSE LibFiles "include/*")
 add_custom_target(headers SOURCES ${LibFiles})
 
-find_package(catkin REQUIRED COMPONENTS
-    roscpp
-    rospy
-    geometry_msgs
-    rosflight_msgs
-    sensor_msgs
-    std_msgs
-    tf2_eigen
-    tf_conversions
-    reef_msgs
-)
+# Find dependencies
+find_package(ament_cmake REQUIRED)
+find_package(ament_cmake_python REQUIRED)
+find_package(rclcpp REQUIRED)
+find_package(rclpy REQUIRED)
+find_package(geometry_msgs REQUIRED)
+find_package(rosflight_msgs REQUIRED)
+find_package(sensor_msgs REQUIRED)
+find_package(std_msgs REQUIRED)
+find_package(tf2_eigen REQUIRED)
+find_package(tf_conversions REQUIRED)
+find_package(reef_msgs REQUIRED)
 
-catkin_package(
-    INCLUDE_DIRS
-    LIBRARIES
-    CATKIN_DEPENDS roscpp rospy sensor_msgs geometry_msgs rosflight rosflight_msgs sensor_msgs std_msgs tf2_eigen
-)
+# Include Cpp "include" directory
+include_directories(include)
 
-include_directories(include ${catkin_INCLUDE_DIRS})
-
+# Create Cpp executable
 add_executable(
     reef_estimator
     src/reef_estimator_node.cpp
@@ -37,15 +35,24 @@ add_executable(
     src/xyz_estimator.cpp include/xyz_estimator.h
     src/xy_estimator.cpp
 )
+ament_target_dependencies(reef_estimator
+  rclcpp
+  std_msgs)
 
-add_dependencies(reef_estimator ${catkin_EXPORTED_TARGETS})
-target_link_libraries(reef_estimator ${catkin_LIBRARIES})
-
-catkin_install_python(PROGRAMS scripts/verify_estimates.py
-        DESTINATION ${CATKIN_PACKAGE_BIN_DESTINATION})
-
+# Install Cpp executables
 install(TARGETS reef_estimator
-    ARCHIVE DESTINATION ${CATKIN_PACKAGE_LIB_DESTINATION}
-    LIBRARY DESTINATION ${CATKIN_PACKAGE_LIB_DESTINATION}
-    RUNTIME DESTINATION ${CATKIN_PACKAGE_BIN_DESTINATION}
-)
+    DESTINATION lib/${PROJECT_NAME})
+install(DIRECTORY include/
+  DESTINATION include)
+  
+# Install Python modules
+ament_python_install_package(${PROJECT_NAME})
+
+# Install Python executables
+install(PROGRAMS scripts/verify_estimates.py
+        DESTINATION $lib/${PROJECT_NAME})
+
+ament_export_dependencies(rclcpp rclpy sensor_msgs geometry_msgs rosflight rosflight_msgs sensor_msgs std_msgs tf2_eigen)
+ament_export_include_directories()
+ament_export_libraries()
+ament_package()

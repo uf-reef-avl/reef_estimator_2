@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 
-import rospy
+import rclpy
 from message_filters import ApproximateTimeSynchronizer, Subscriber
 from reef_msgs.msg import SyncEstimateError
 import math
@@ -23,7 +23,7 @@ class verifyRGBD(PlotWindow):
 
         print("Verifying RGBD")
 
-        rospy.Subscriber("estimate_error", SyncEstimateError, self.error_cb)
+        node.create_subscriber(SyncEstimateError, "estimate_error", self.error_cb, rclpy.qos.QoSProfile())
 
         self.window_size = 10000
         self.counter = 0
@@ -118,12 +118,13 @@ class verifyRGBD(PlotWindow):
             self.canvas.draw()
 
 if __name__ == '__main__':
-    rospy.init_node("online_histogram", anonymous=False)
+    rclpy.init(args=sys.argv)
+    node = rclpy.create_node("online_histogram")
 
     try:
         app = QApplication(sys.argv)
         verifyObj = verifyRGBD()
         verifyObj.show()
         app.exec_()
-    except rospy.ROSInterruptException: pass
-    rospy.spin()
+    except rclpy.ROSInterruptException: pass
+    rclpy.spin()
